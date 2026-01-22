@@ -1,6 +1,7 @@
 import { generateToken } from "../lib/utils.js";
 import User from "../models/user.model.js";
 import bcrypt from "bcrypt";
+import { sendEmailOtp } from "../lib/email.js";
 
 const generateOTP = () =>
   Math.floor(100000 + Math.random() * 900000).toString();
@@ -59,6 +60,9 @@ export const signup = async (req, res) => {
 
       await userExists.save();
 
+      await sendEmailOtp(email, emailOtp);
+
+      await sendEmailOtp(email, emailOtp);
       console.log(`=== RETRY OTP for ${email} ===`);
       console.log("Email OTP:", emailOtp);
       console.log("Phone OTP:", phoneOtp);
