@@ -49,7 +49,24 @@ const userSchema = new mongoose.Schema(
         isProfileComplete: {
             type: Boolean,
             default: false
-        }
+        },
+        isEmailVerified: {
+            type: Boolean,
+            default: false
+        },
+        isPhoneVerified: {
+            type: Boolean,
+            default: false
+        },
+        emailOtp: {
+            type: String, // Store the 6-digit code
+        },
+        phoneOtp: {
+            type: String, // Store the 6-digit code
+        },
+        otpExpires: {
+            type: Date // OTP validity (e.g., 10 mins)
+        },
     },
     {
         timestamps: true
