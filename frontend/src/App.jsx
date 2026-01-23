@@ -11,6 +11,7 @@ import SignUpPage from './pages/SignUpPage';
 import LoginPage from './pages/LoginPage';
 import BloodCentersPage from './pages/BloodCentersPage';
 import HospitalLoginPage from './pages/HospitalLoginPage'; 
+import AboutPage from './pages/AboutPage';
 
 // === NEW IMPORTS ===
 import HospitalOnboardingPage from './pages/HospitalOnboardingPage'; // The new One-Shot form
@@ -59,6 +60,8 @@ const App = () => {
         <Route path="/hospital" element={
             authUser?.role === 'hospital' ? <HospitalDashboard /> : <Navigate to="/hospital/login" />
         } />
+
+        <Route path="/about" element={<AboutPage />} />
 
       </Routes>
     </div>
