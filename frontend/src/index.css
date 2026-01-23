@@ -1,13 +1,47 @@
 @import "tailwindcss";
 @plugin "daisyui";
 
+/* 1. FORCE LIGHT MODE DEFAULTS */
+:root {
+  color-scheme: light; /* Tells browser this is a light-mode app */
+}
+
 @layer base {
-  input, textarea, select {
-    @apply text-gray-900 bg-white border-gray-300;
+  body {
+    @apply text-gray-900 bg-gray-50; /* Base text color */
   }
-  
-  /* Optional: Make them look nicer when you click them */
+
+  /* 2. FIX INPUT VISIBILITY */
+  input, textarea, select {
+    @apply text-gray-900 bg-white border border-gray-300 rounded-md shadow-sm;
+    background-color: white !important; /* Force White BG */
+    color: #111827 !important; /* Force Dark Text (Gray-900) */
+  }
+
+  /* 3. FIX PLACEHOLDER COLOR */
+  input::placeholder, textarea::placeholder {
+    @apply text-gray-400;
+    opacity: 1; /* Firefox fix */
+  }
+
+  /* 4. FOCUS STATE */
   input:focus, textarea:focus, select:focus {
     @apply ring-2 ring-[#b30000] border-transparent outline-none;
+  }
+
+  /* 5. FIX BROWSER AUTOFILL (The "Yellow Box" Bug) */
+  /* This prevents Chrome from turning the background blue/yellow and text white */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover, 
+  input:-webkit-autofill:focus, 
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus,
+  select:-webkit-autofill,
+  select:-webkit-autofill:hover,
+  select:-webkit-autofill:focus {
+    -webkit-text-fill-color: #111827 !important; /* Force text dark */
+    -webkit-box-shadow: 0 0 0px 1000px white inset !important; /* Force bg white */
+    transition: background-color 5000s ease-in-out 0s;
   }
 }

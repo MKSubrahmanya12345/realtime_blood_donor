@@ -6,6 +6,7 @@ import { sendEmailOtp } from "../lib/email.js";
 const generateOTP = () =>
   Math.floor(100000 + Math.random() * 900000).toString();
 
+// ================= SIGNUP =================
 export const signup = async (req, res) => {
   const {
     fullName,
@@ -13,9 +14,9 @@ export const signup = async (req, res) => {
     password,
     phone,
     bloodGroup,
-    address, // This captures the text "Bangalore"
-    latitude, // This captures the number 12.97
-    longitude, // This captures the number 77.59
+    address, // Captures text address (e.g., "Bangalore")
+    latitude, // Captures number (e.g., 12.97)
+    longitude, // Captures number (e.g., 77.59)
     collegeName,
     collegeId,
   } = req.body;
@@ -64,8 +65,8 @@ export const signup = async (req, res) => {
       userExists.password = hashedPassword;
       userExists.phone = phone;
       userExists.bloodGroup = bloodGroup;
-      userExists.address = address;       // Save text address
-      userExists.location = locationData; // Save GeoJSON object
+      userExists.address = address;       
+      userExists.location = locationData; // Save GeoJSON
       userExists.collegeName = collegeName;
       userExists.collegeId = collegeId;
       userExists.emailOtp = emailOtp;
@@ -73,7 +74,6 @@ export const signup = async (req, res) => {
       userExists.otpExpires = Date.now() + 10 * 60 * 1000;
 
       await userExists.save();
-
       await sendEmailOtp(email, emailOtp);
 
       console.log(`=== RETRY OTP for ${email} ===`);
@@ -100,8 +100,8 @@ export const signup = async (req, res) => {
       password: hashedPassword,
       phone,
       bloodGroup,
-      address,       // Save text address
-      location: locationData, // Save GeoJSON object
+      address,       
+      location: locationData, // Save GeoJSON
       collegeName,
       collegeId,
       emailOtp,
@@ -109,11 +109,11 @@ export const signup = async (req, res) => {
       otpExpires: Date.now() + 10 * 60 * 1000, // 10 mins
       isEmailVerified: false,
       isPhoneVerified: false,
+      role: "pending", // Start as pending
+      isAvailable: true // Default to Available
     });
 
     await newUser.save();
-    
-    // Send Email
     await sendEmailOtp(email, emailOtp);
 
     // DEV MODE: log OTPs
@@ -133,7 +133,6 @@ export const signup = async (req, res) => {
 };
 
 // ================= VERIFY OTP =================
-
 export const verifyOtp = async (req, res) => {
   const { email, type, otp } = req.body;
 
@@ -172,7 +171,6 @@ export const verifyOtp = async (req, res) => {
       if (user.role === "pending") {
         user.role = "donor";
       }
-
       generateToken(user._id, res);
     }
 
@@ -190,6 +188,8 @@ export const verifyOtp = async (req, res) => {
             email: user.email,
             role: user.role,
             profilePic: user.profilePic,
+            isAvailable: user.isAvailable, // <--- Sent to Frontend
+            location: user.location,       // <--- Sent to Frontend
           }
         : null,
     });
@@ -198,9 +198,6 @@ export const verifyOtp = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
-
-
-
 
 // ================= LOGIN =================
 export const login = async (req, res) => {
@@ -234,6 +231,9 @@ export const login = async (req, res) => {
       fullName: user.fullName,
       email: user.email,
       profilePic: user.profilePic,
+      role: user.role,
+      isAvailable: user.isAvailable, // <--- FIX: Send Status
+      location: user.location,       // <--- FIX: Send Location
     });
   } catch (error) {
     console.log("Error in login controller", error.message);
@@ -252,8 +252,7 @@ export const logout = (req, res) => {
   }
 };
 
-
-// ================= UPDATE PROFILE =================
+// ================= UPDATE PROFILE (FIXED) =================
 export const updateProfile = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -264,14 +263,39 @@ export const updateProfile = async (req, res) => {
       medications, 
       hasTattoo,         
       recentSurgery,
+      latitude,   // <--- Added
+      longitude,  // <--- Added
+      isAvailable,
+      address // <--- Added
     } = req.body;
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Update fields
+    
+    if (address) {  // <--- 2. ADD THIS BLOCK
+        user.address = address;
+    }
+
+    
+    // Update GPS Location if provided
+
+
+    if (latitude && longitude) {
+        user.location = {
+            type: "Point",
+            coordinates: [parseFloat(longitude), parseFloat(latitude)]
+        };
+    }
+
+    // Update Availability if provided
+    if (isAvailable !== undefined) {
+        user.isAvailable = isAvailable;
+    }
+
+    // Update Medical Info
     if (weight) user.weight = weight;
-    // Add logic here to update other fields as needed
+    // (Add other fields as needed)
     
     user.isProfileComplete = true; 
 
@@ -279,7 +303,11 @@ export const updateProfile = async (req, res) => {
 
     res.status(200).json({ 
       message: "Profile updated successfully", 
-      user 
+      user: {
+          ...user._doc,
+          isAvailable: user.isAvailable, // Ensure updated status is returned
+          location: user.location        // Ensure updated location is returned
+      }
     });
 
   } catch (error) {
@@ -288,6 +316,28 @@ export const updateProfile = async (req, res) => {
   }
 };
 
+// ================= CHECK AUTH =================
+export const checkAuth = async (req, res) => {
+  try {
+    // req.user is populated by middleware, but let's fetch fresh data
+    const user = await User.findById(req.user._id);
+    
+    res.status(200).json({
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        profilePic: user.profilePic,
+        isAvailable: user.isAvailable, // <--- FIX: Send Status
+        location: user.location,       // <--- FIX: Send Location
+    });
+  } catch (error) {
+    console.log("Error in checkAuth controller", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// ================= TOGGLE AVAILABILITY =================
 export const toggleAvailability = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
@@ -296,16 +346,5 @@ export const toggleAvailability = async (req, res) => {
     res.status(200).json({ isAvailable: user.isAvailable, message: "Status updated!" });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
-  }
-};
-
-
-export const checkAuth = (req, res) => {
-  try {
-    // Because 'protectRoute' middleware already ran, req.user is populated
-    res.status(200).json(req.user);
-  } catch (error) {
-    console.log("Error in checkAuth controller", error.message);
-    res.status(500).json({ message: "Internal Server Error" });
   }
 };

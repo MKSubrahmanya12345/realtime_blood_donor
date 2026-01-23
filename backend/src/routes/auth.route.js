@@ -19,6 +19,5 @@ router.put("/toggle-availability", protectRoute, toggleAvailability);
 
 
 router.get("/check", protectRoute, checkAuth);
-router.put("/update-profile", protectRoute, updateProfile);
-
+router.put("/update-profile", protectRoute, updateProfile); // <--- ADD THIS LINE
 export default router;
