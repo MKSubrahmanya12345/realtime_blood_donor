@@ -5,11 +5,11 @@ import { toast } from 'react-hot-toast';
 import { axiosInstance } from '../lib/axios';
 
 // === MAP IMPORTS ===
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, CircleMarker, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// Fix for default Leaflet marker icons missing in React
+// Fix for default Leaflet marker icons
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
@@ -31,7 +31,7 @@ function DraggableMarker({ position, setPosition }) {
         const marker = markerRef.current;
         if (marker != null) {
           const { lat, lng } = marker.getLatLng();
-          setPosition({ lat, lng }); // Update parent state
+          setPosition({ lat, lng });
         }
       },
     }),
@@ -45,7 +45,7 @@ function DraggableMarker({ position, setPosition }) {
       position={position}
       ref={markerRef}>
       <Popup minWidth={90}>
-        <span>Compendium Hospital Location</span>
+        <span>Your Hospital Location</span>
       </Popup>
     </Marker>
   );
@@ -57,10 +57,10 @@ const HospitalDashboard = () => {
   const [hospitalInfo, setHospitalInfo] = useState(null);
   
   // MAP STATE
-  const [markerPosition, setMarkerPosition] = useState({ lat: 12.9716, lng: 77.5946 }); // Default Bangalore
+  const [markerPosition, setMarkerPosition] = useState({ lat: 12.9716, lng: 77.5946 });
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
+  const [foundDonors, setFoundDonors] = useState([]); // <--- STORE DONORS HERE
 
-  // Default inventory in case DB is empty
   const [inventory, setInventory] = useState({
     'A+': 0, 'A-': 0, 'B+': 0, 'B-': 0,
     'AB+': 0, 'AB-': 0, 'O+': 0, 'O-': 0
@@ -74,7 +74,7 @@ const HospitalDashboard = () => {
 
   const [requestLoading, setRequestLoading] = useState(false);
 
-  // === 1. FETCH HOSPITAL DATA ON LOAD ===
+  // === 1. FETCH DATA ===
   useEffect(() => {
     const fetchHospitalData = async () => {
       try {
@@ -82,9 +82,7 @@ const HospitalDashboard = () => {
         setHospitalInfo(res.data);
         if (res.data.inventory) setInventory(res.data.inventory);
         
-        // Set Map Position from DB if available
         if (res.data.location && res.data.location.coordinates) {
-             // MongoDB is [Lng, Lat], Leaflet needs [Lat, Lng]
              setMarkerPosition({
                  lat: res.data.location.coordinates[1],
                  lng: res.data.location.coordinates[0]
@@ -101,12 +99,10 @@ const HospitalDashboard = () => {
     fetchHospitalData();
   }, []);
 
-  // === 2. UPDATE LOCATION HANDLER ===
+  // === 2. UPDATE LOCATION ===
   const handleUpdateLocation = async () => {
       setIsUpdatingLocation(true);
       try {
-          // Send new coordinates to Backend
-          // NOTE: Ensure your /hospital/update-profile route exists or reuse auth route
           await axiosInstance.put('/auth/update-profile', {
               latitude: markerPosition.lat,
               longitude: markerPosition.lng
@@ -119,12 +115,20 @@ const HospitalDashboard = () => {
       }
   };
 
-  // === 3. HANDLE BLOOD REQUEST ===
+  // === 3. HANDLE REQUEST & MAP DONORS ===
   const handleRequest = async (e) => {
     e.preventDefault();
     setRequestLoading(true);
+    setFoundDonors([]); // Reset previous search
+
     try {
         const res = await axiosInstance.post('/hospital/request', requestData);
+        
+        // SAVE DONORS TO STATE
+        if (res.data.donors) {
+            setFoundDonors(res.data.donors);
+        }
+
         toast.success(
             <div className="flex flex-col">
                 <span className="font-bold">Broadcast Sent! 📡</span>
@@ -164,7 +168,6 @@ const HospitalDashboard = () => {
                     License: <span className="font-mono text-gray-700 bg-gray-200 px-2 py-0.5 rounded text-sm">{hospitalInfo?.licenseNumber}</span>
                 </p>
             </div>
-            
             <div className="flex gap-3">
                 <button className="flex items-center gap-2 bg-white border border-gray-300 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition">
                     <Users size={18} /> Donor Database
@@ -180,7 +183,7 @@ const HospitalDashboard = () => {
             {/* LEFT COLUMN: INVENTORY & MAP */}
             <div className="lg:col-span-2 space-y-8">
                 
-                {/* 1. INVENTORY CARD */}
+                {/* 1. INVENTORY */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                     <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-gray-800">
                         <Droplet className="text-red-500 fill-current" size={20} /> 
@@ -189,16 +192,9 @@ const HospitalDashboard = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         {Object.entries(inventory).map(([group, count]) => (
                             <div key={group} className={`relative p-4 rounded-xl border-2 transition-all duration-200 ${
-                                count < 5 
-                                ? 'bg-red-50 border-red-100 hover:border-red-300' 
-                                : 'bg-emerald-50 border-emerald-100 hover:border-emerald-300'
+                                count < 5 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'
                             }`}>
-                                <div className="flex justify-between items-start mb-2">
-                                    <h3 className="text-2xl font-black text-gray-800">{group}</h3>
-                                    {count < 5 && (
-                                        <span className="bg-red-200 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Low</span>
-                                    )}
-                                </div>
+                                <h3 className="text-2xl font-black text-gray-800">{group}</h3>
                                 <p className={`text-lg font-bold ${count < 5 ? 'text-red-700' : 'text-emerald-700'}`}>
                                     {count} <span className="text-sm font-medium opacity-70">Units</span>
                                 </p>
@@ -207,12 +203,12 @@ const HospitalDashboard = () => {
                     </div>
                 </div>
 
-                {/* 2. LOCATION MAP CARD (NEW) */}
+                {/* 2. MAP CARD */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                      <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-bold flex items-center gap-2 text-gray-800">
                             <MapPin className="text-blue-600" size={20} /> 
-                            Update Hospital Location
+                            Live Map
                         </h2>
                         <button 
                             onClick={handleUpdateLocation}
@@ -220,26 +216,38 @@ const HospitalDashboard = () => {
                             className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-green-700 transition"
                         >
                              {isUpdatingLocation ? <Loader size={16} className="animate-spin"/> : <Save size={16}/>}
-                             Save New Location
+                             Save Location
                         </button>
                      </div>
                      
-                     <div className="h-64 w-full rounded-xl overflow-hidden border-2 border-gray-200 relative z-0">
-                         {/* MAP CONTAINER */}
-                         <MapContainer 
-                            center={markerPosition} 
-                            zoom={13} 
-                            style={{ height: "100%", width: "100%" }}
-                         >
+                     <div className="h-96 w-full rounded-xl overflow-hidden border-2 border-gray-200 relative z-0">
+                         <MapContainer center={markerPosition} zoom={13} style={{ height: "100%", width: "100%" }}>
                             <TileLayer
-                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                attribution='&copy; OpenStreetMap contributors'
                                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                             />
+                            
+                            {/* HOSPITAL MARKER (DRAGGABLE) */}
                             <DraggableMarker position={markerPosition} setPosition={setMarkerPosition} />
+
+                            {/* DONOR MARKERS (RED DOTS) */}
+                            {foundDonors.map((donor) => (
+                                donor.location && donor.location.coordinates ? (
+                                    <CircleMarker 
+                                        key={donor._id}
+                                        center={[donor.location.coordinates[1], donor.location.coordinates[0]]}
+                                        pathOptions={{ color: 'red', fillColor: '#f00', fillOpacity: 0.7 }}
+                                        radius={8}
+                                    >
+                                        <Tooltip>{donor.fullName} ({donor.bloodGroup})</Tooltip>
+                                    </CircleMarker>
+                                ) : null
+                            ))}
+
                          </MapContainer>
                      </div>
                      <p className="text-xs text-gray-500 mt-2 text-center">
-                        *Drag the marker to pinpoint your exact hospital entrance.
+                        *Drag the Blue Marker to set Hospital location. Red dots are found donors.
                      </p>
                 </div>
 
@@ -253,19 +261,18 @@ const HospitalDashboard = () => {
                     </div>
                     <div>
                         <h2 className="text-xl font-bold text-gray-900">Emergency Broadcast</h2>
-                        <p className="text-xs text-red-600 font-bold uppercase tracking-wider">High Priority Alert</p>
                     </div>
                 </div>
 
                 <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-                    This tool will locate registered donors within <span className="font-bold text-gray-900">10 KM</span> of your facility and send immediate SMS/Email alerts.
+                    Locate registered donors within <span className="font-bold text-gray-900">10 KM</span>.
                 </p>
 
                 <form onSubmit={handleRequest} className="space-y-5">
                     <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">Blood Group Required</label>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Blood Group</label>
                         <select 
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-gray-50"
+                            className="w-full p-3 border border-gray-300 rounded-lg outline-none bg-gray-50"
                             value={requestData.bloodGroup}
                             onChange={(e) => setRequestData({...requestData, bloodGroup: e.target.value})}
                         >
@@ -274,12 +281,10 @@ const HospitalDashboard = () => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">Units Needed</label>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Units</label>
                         <input 
-                            type="number" 
-                            min="1"
-                            max="50"
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-gray-50"
+                            type="number" min="1" max="50"
+                            className="w-full p-3 border border-gray-300 rounded-lg outline-none bg-gray-50"
                             value={requestData.units}
                             onChange={(e) => setRequestData({...requestData, units: e.target.value})}
                         />
@@ -288,7 +293,7 @@ const HospitalDashboard = () => {
                     <button 
                         type="submit" 
                         disabled={requestLoading}
-                        className="w-full bg-red-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-red-700 transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                        className="w-full bg-red-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-red-700 transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-70"
                     >
                         {requestLoading ? <Loader className="animate-spin" /> : <AlertTriangle className="fill-current" />}
                         {requestLoading ? "Broadcasting..." : "Find Donors Nearby"}

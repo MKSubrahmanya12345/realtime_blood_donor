@@ -6,16 +6,15 @@ import { sendEmergencyEmail } from "../lib/email.js";
 
 // === 1. ONE-SHOT REGISTER (Create User + Hospital) ===
 export const registerHospital = async (req, res) => {
-  let savedUser = null; // Track user for emergency deletion (rollback)
+  let savedUser = null; 
 
   try {
     const {
-      fullName, email, password, phone, // Admin Details
-      hospitalName, licenseNumber, address, latitude, longitude, // Hospital Details
+      fullName, email, password, phone, 
+      hospitalName, licenseNumber, address, latitude, longitude, 
       capacity, hasEmergencyServices, operatingHours
     } = req.body;
 
-    // --- VALIDATION STEP (Do this FIRST) ---
     if (!latitude || !longitude) {
       return res.status(400).json({ message: "Hospital location is required" });
     }
@@ -29,14 +28,12 @@ export const registerHospital = async (req, res) => {
         });
     }
 
-    // Check for duplicates
     const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(400).json({ message: "Email already registered" });
 
     const existingHospital = await Hospital.findOne({ licenseNumber });
     if (existingHospital) return res.status(400).json({ message: "License number already registered" });
 
-    // --- STEP 1: Create Admin User ---
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -50,9 +47,8 @@ export const registerHospital = async (req, res) => {
       isPhoneVerified: true
     });
     
-    savedUser = await newUser.save(); // <--- User is in DB now
+    savedUser = await newUser.save(); 
 
-    // --- STEP 2: Create Hospital Profile ---
     const newHospital = new Hospital({
       hospitalName,
       email,
@@ -61,7 +57,7 @@ export const registerHospital = async (req, res) => {
       address,
       location: {
         type: "Point",
-        coordinates: [lng, lat] // [Longitude, Latitude]
+        coordinates: [lng, lat] 
       },
       capacity,
       hasEmergencyServices,
@@ -70,8 +66,6 @@ export const registerHospital = async (req, res) => {
     });
 
     await newHospital.save();
-
-    // --- STEP 3: Success ---
     generateToken(savedUser._id, res);
 
     res.status(201).json({
@@ -84,14 +78,9 @@ export const registerHospital = async (req, res) => {
 
   } catch (error) {
     console.log("Error in registerHospital:", error.message);
-
-    // === ROLLBACK ===
-    // If the hospital failed to save, DELETE the user we just created.
     if (savedUser) {
         await User.findByIdAndDelete(savedUser._id);
-        console.log("⚠️ Rolled back orphaned user:", savedUser.email);
     }
-
     res.status(500).json({ message: "Server Error" });
   }
 };
@@ -108,7 +97,7 @@ export const getMyHospital = async (req, res) => {
   }
 };
 
-// === 3. REQUEST BLOOD ===
+// === 3. REQUEST BLOOD (Updated to return Donor Locations) ===
 export const requestBlood = async (req, res) => {
     try {
         const { bloodGroup, units } = req.body;
@@ -136,17 +125,17 @@ export const requestBlood = async (req, res) => {
                     $maxDistance: 10000 // 10km radius
                 }
             }
-        });
+        }).select('fullName location bloodGroup email'); // Select only needed fields
 
         if (nearbyDonors.length === 0) {
             return res.status(200).json({ 
                 message: "No compatible donors found nearby.",
-                donorsFound: 0
+                donorsFound: 0,
+                donors: []
             });
         }
 
         // === SEND EMAILS ===
-        // Using Promise.allSettled to ensure one failed email doesn't crash the loop
         const emailResults = await Promise.allSettled(nearbyDonors.map(donor => {
             return sendEmergencyEmail(
                 donor.email,
@@ -164,7 +153,8 @@ export const requestBlood = async (req, res) => {
         res.status(200).json({
             message: `Emergency broadcast sent successfully!`,
             donorsFound: nearbyDonors.length,
-            emailsSent: successCount
+            emailsSent: successCount,
+            donors: nearbyDonors // <--- SENDING DONOR DATA TO FRONTEND
         });
 
     } catch (error) {
