@@ -224,7 +224,7 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    generateToken(user._id, res);
+    const token = generateToken(user._id, res);
 
     res.status(200).json({
       _id: user._id,
@@ -233,7 +233,8 @@ export const login = async (req, res) => {
       profilePic: user.profilePic,
       role: user.role,
       isAvailable: user.isAvailable, // <--- FIX: Send Status
-      location: user.location,       // <--- FIX: Send Location
+      location: user.location,
+      token,       // <--- FIX: Send Location
     });
   } catch (error) {
     console.log("Error in login controller", error.message);

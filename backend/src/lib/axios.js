@@ -7,3 +7,11 @@ export const axiosInstance = axios.create({
     : "/api", // We will use a proxy on Vercel (cleaner) OR put your full Render URL here
   withCredentials: true,
 });
+
+axiosInstance.interceptors.request.use((config) => {
+    const token = localStorage.getItem("jwt"); // Retrieve token
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`; // Attach to header
+    }
+    return config;
+});
