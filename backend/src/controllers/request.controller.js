@@ -1,35 +1,48 @@
 import Request from "../models/request.model.js";
 import User from "../models/user.model.js";
-import { sendEmergencyEmail } from "../lib/email.js"; // Import Email Logic
+import { sendEmergencyEmail } from "../lib/email.js";
 
-// 1. Create a new Blood Request AND Notify Donors
+// DEBUG VERSION: Create Request & Notify
 export const createRequest = async (req, res) => {
+  console.log("---------------------------------------");
+  console.log("🚀 PROCESSING BLOOD REQUEST");
+
   try {
     const { 
         patientName, bloodGroup, unitsRequired, 
         hospitalName, location, urgency, 
         contactNumber, note,
-        latitude, longitude // <--- Captured from Frontend
+        latitude, longitude 
     } = req.body;
 
-    // 1. Save the Request to Database
+    // LOG 1: Did we get the data?
+    console.log("1. Payload Received:", { bloodGroup, location });
+    console.log("   GPS Coords:", latitude, longitude);
+
+    if (!latitude || !longitude) {
+        console.log("❌ ERROR: No GPS coordinates received from Frontend!");
+    }
+
+    // 1. Save Request
     const newRequest = new Request({
       requesterId: req.user._id,
       patientName,
       bloodGroup,
       unitsRequired,
       hospitalName,
-      location, // Text address
+      location,
+      latitude,
+      longitude,
       urgency,
       contactNumber,
       note
     });
     await newRequest.save();
+    console.log("2. Request Saved to Database ✅");
 
-    // 2. SEARCH NEIGHBORING DONORS
-    // Only if we have valid coordinates
+    // 2. Search Donors
     if (latitude && longitude) {
-        console.log(`Searching for ${bloodGroup} donors near ${location}...`);
+        console.log(`3. Searching for [${bloodGroup}] donors near [${longitude}, ${latitude}]...`);
         
         const nearbyDonors = await User.find({
             role: 'donor',
@@ -41,48 +54,58 @@ export const createRequest = async (req, res) => {
                         type: "Point",
                         coordinates: [parseFloat(longitude), parseFloat(latitude)]
                     },
-                    $maxDistance: 10000 // 10km radius
+                    $maxDistance: 10000 // 10km
                 }
             }
         });
 
-        console.log(`Found ${nearbyDonors.length} donors.`);
+        console.log(`4. Donors Found: ${nearbyDonors.length}`);
 
-        // 3. SEND EMAILS (Async - Don't wait for all to finish)
-        Promise.allSettled(nearbyDonors.map(donor => {
-            return sendEmergencyEmail(
-                donor.email,
-                donor.fullName,
-                hospitalName, // Passing Hospital Name
-                bloodGroup,
-                unitsRequired,
-                location,     // Passing Address
-                contactNumber
-            );
-        }));
+        if (nearbyDonors.length === 0) {
+            console.log("⚠️ No donors found nearby. (Check your dummy donor location!)");
+        } else {
+            console.log("5. Sending Emails to:");
+            nearbyDonors.forEach(d => console.log(`   -> 📧 ${d.email}`));
+            
+            // Send Emails
+            const results = await Promise.allSettled(nearbyDonors.map(donor => {
+                return sendEmergencyEmail(
+                    donor.email,
+                    donor.fullName,
+                    hospitalName,
+                    bloodGroup,
+                    unitsRequired,
+                    location,
+                    contactNumber
+                );
+            }));
+            
+            // LOG EMAIL RESULTS
+            const successes = results.filter(r => r.status === 'fulfilled').length;
+            const failures = results.filter(r => r.status === 'rejected').length;
+            console.log(`6. Email Status: ${successes} Sent, ${failures} Failed.`);
+        }
     }
 
     res.status(201).json({
         request: newRequest,
-        message: "Request posted and donors notified!"
+        message: "Request posted!"
     });
 
   } catch (error) {
-    console.log("Error in createRequest:", error.message);
+    console.log("💥 CRITICAL ERROR:", error.message);
     res.status(500).json({ message: "Server Error" });
   }
 };
 
-// 2. Get All Active Requests
+// 2. Get All Requests (No changes needed here)
 export const getAllRequests = async (req, res) => {
   try {
     const requests = await Request.find({ status: 'Active' })
       .populate('requesterId', 'fullName email') 
       .sort({ createdAt: -1 });
-    
     res.status(200).json(requests);
   } catch (error) {
-    console.log("Error in getAllRequests:", error.message);
     res.status(500).json({ message: "Server Error" });
   }
 };

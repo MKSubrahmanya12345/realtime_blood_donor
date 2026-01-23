@@ -23,16 +23,18 @@ const RequestBloodPage = () => {
   });
 
   // === GPS FUNCTION ===
+  // === GPS FUNCTION (FIXED) ===
   const getCurrentLocation = () => {
     setGpsLoading(true);
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setFormData({
-            ...formData,
+          // FIX: Use 'prev' to get the latest state, preventing data loss
+          setFormData(prev => ({
+            ...prev,
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
-          });
+          }));
           toast.success("Location Captured!");
           setGpsLoading(false);
         },
@@ -44,6 +46,7 @@ const RequestBloodPage = () => {
     }
   };
 
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);

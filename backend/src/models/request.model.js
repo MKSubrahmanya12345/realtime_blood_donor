@@ -15,7 +15,9 @@ const requestSchema = new mongoose.Schema(
     },
     unitsRequired: { type: Number, required: true, default: 1 },
     hospitalName: { type: String, required: true },
-    location: { type: String, required: true }, // City/Area
+    location: { type: String, required: true },
+    latitude: { type: Number }, 
+    longitude: { type: Number },
     urgency: {
       type: String,
       enum: ["Low", "Medium", "Critical"],

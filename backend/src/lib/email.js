@@ -3,11 +3,15 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+console.log("DEBUG AUTH CHECK:");
+console.log("User:", process.env.EMAIL_USER ? "Exists ✅" : "UNDEFINED ❌");
+console.log("Pass:", process.env.EMAIL_PASS ? "Exists ✅" : "UNDEFINED ❌");
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.EMAIL_USER, // Check your .env file
-    pass: process.env.EMAIL_PASS, // Check your .env file (App Password)
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
 });
 
@@ -38,6 +42,10 @@ export const sendEmailOtp = async (email, otp) => {
 
 // === 2. EMERGENCY BROADCAST EMAIL (For Hospital Requests) ===
 export const sendEmergencyEmail = async (donorEmail, donorName, hospitalName, bloodGroup, units, address, contact) => {
+  
+  // Create a clean, safe Google Maps Link
+  const mapLink = `https://www.google.com/maps/search/?api=1&query=$${encodeURIComponent(address)}`;
+
   const mailOptions = {
     from: `"BloodLink Emergency" <${process.env.EMAIL_USER}>`,
     to: donorEmail,
@@ -65,7 +73,7 @@ export const sendEmergencyEmail = async (donorEmail, donorName, hospitalName, bl
           </div>
 
           <div style="text-align: center; margin-top: 30px;">
-            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}" style="background-color: #b30000; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Get Directions</a>
+            <a href="${mapLink}" style="background-color: #b30000; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Get Directions</a>
             <br/><br/>
             <a href="tel:${contact}" style="color: #b30000; text-decoration: none; font-weight: bold;">📞 Call Hospital: ${contact}</a>
           </div>
@@ -80,8 +88,8 @@ export const sendEmergencyEmail = async (donorEmail, donorName, hospitalName, bl
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`Emergency email sent to ${donorEmail}`);
+    console.log(`Emergency email sent to ${donorEmail} ✅`);
   } catch (error) {
-    console.error(`Failed to send email to ${donorEmail}:`, error);
+    console.error(`Failed to send email to ${donorEmail} ❌:`, error);
   }
 };
