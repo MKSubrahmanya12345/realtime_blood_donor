@@ -242,15 +242,6 @@ export const logout = (req, res) => {
   }
 };
 
-// ================= CHECK AUTH =================
-export const checkAuth = (req, res) => {
-  try {
-    res.status(200).json(req.user);
-  } catch (error) {
-    console.log("Error in checkAuth controller", error.message);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-};
 
 // ================= UPDATE PROFILE =================
 export const updateProfile = async (req, res) => {
@@ -295,5 +286,16 @@ export const toggleAvailability = async (req, res) => {
     res.status(200).json({ isAvailable: user.isAvailable, message: "Status updated!" });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+export const checkAuth = (req, res) => {
+  try {
+    // Because 'protectRoute' middleware already ran, req.user is populated
+    res.status(200).json(req.user);
+  } catch (error) {
+    console.log("Error in checkAuth controller", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };

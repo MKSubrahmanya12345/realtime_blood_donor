@@ -39,6 +39,17 @@ export const registerHospital = async (req, res) => {
     const savedUser = await newUser.save();
 
     // 2. Create Hospital Profile
+
+
+    const lng = parseFloat(req.body.longitude);
+    const lat = parseFloat(req.body.latitude);
+
+    // 2. Validate (Ensure they are actual numbers)
+    if (isNaN(lng) || isNaN(lat)) {
+        return res.status(400).json({ 
+            error: "Invalid location. Longitude and Latitude are required and must be numbers." 
+        });
+    }
     const newHospital = new Hospital({
       hospitalName,
       email,
@@ -47,13 +58,15 @@ export const registerHospital = async (req, res) => {
       address,
       location: {
         type: "Point",
-        coordinates: [parseFloat(longitude), parseFloat(latitude)]
+        coordinates: [lng, lat]
       },
       capacity,
       hasEmergencyServices,
       operatingHours,
       adminUserId: savedUser._id
     });
+
+    console.log("Constructed Location:", JSON.stringify(newHospital.location, null, 2));
     await newHospital.save();
 
     // 3. Auto-Login
