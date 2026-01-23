@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/useAuthStore';
 import { Loader } from "lucide-react";
+import "leaflet/dist/leaflet.css";
 
 import Navbar from './components/Navbar';
 import HeroPage from './pages/HeroPage';

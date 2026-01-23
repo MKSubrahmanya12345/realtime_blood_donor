@@ -133,6 +133,7 @@ export const signup = async (req, res) => {
 };
 
 // ================= VERIFY OTP =================
+
 export const verifyOtp = async (req, res) => {
   const { email, type, otp } = req.body;
 
@@ -168,8 +169,14 @@ export const verifyOtp = async (req, res) => {
       user.isEmailVerified && user.isPhoneVerified;
 
     if (isFullyVerified) {
+      if (user.role === "pending") {
+        user.role = "donor";
+      }
+
       generateToken(user._id, res);
     }
+
+    await user.save();
 
     res.status(200).json({
       message: `${type} verified successfully`,
@@ -191,6 +198,9 @@ export const verifyOtp = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+
+
 
 // ================= LOGIN =================
 export const login = async (req, res) => {

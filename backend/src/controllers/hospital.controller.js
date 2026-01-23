@@ -6,6 +6,8 @@ import { sendEmergencyEmail } from "../lib/email.js";
 
 // === 1. ONE-SHOT REGISTER (Create User + Hospital) ===
 export const registerHospital = async (req, res) => {
+  let savedUser = null; // Track user for emergency deletion (rollback)
+
   try {
     const {
       fullName, email, password, phone, // Admin Details
@@ -13,17 +15,28 @@ export const registerHospital = async (req, res) => {
       capacity, hasEmergencyServices, operatingHours
     } = req.body;
 
+    // --- VALIDATION STEP (Do this FIRST) ---
     if (!latitude || !longitude) {
       return res.status(400).json({ message: "Hospital location is required" });
     }
 
+    const lng = parseFloat(longitude);
+    const lat = parseFloat(latitude);
+
+    if (isNaN(lng) || isNaN(lat)) {
+        return res.status(400).json({ 
+            error: "Invalid location. Coordinates must be numbers." 
+        });
+    }
+
+    // Check for duplicates
     const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(400).json({ message: "Email already registered" });
 
     const existingHospital = await Hospital.findOne({ licenseNumber });
     if (existingHospital) return res.status(400).json({ message: "License number already registered" });
 
-    // 1. Create Admin User
+    // --- STEP 1: Create Admin User ---
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -36,20 +49,10 @@ export const registerHospital = async (req, res) => {
       isEmailVerified: true,
       isPhoneVerified: true
     });
-    const savedUser = await newUser.save();
+    
+    savedUser = await newUser.save(); // <--- User is in DB now
 
-    // 2. Create Hospital Profile
-
-
-    const lng = parseFloat(req.body.longitude);
-    const lat = parseFloat(req.body.latitude);
-
-    // 2. Validate (Ensure they are actual numbers)
-    if (isNaN(lng) || isNaN(lat)) {
-        return res.status(400).json({ 
-            error: "Invalid location. Longitude and Latitude are required and must be numbers." 
-        });
-    }
+    // --- STEP 2: Create Hospital Profile ---
     const newHospital = new Hospital({
       hospitalName,
       email,
@@ -58,7 +61,7 @@ export const registerHospital = async (req, res) => {
       address,
       location: {
         type: "Point",
-        coordinates: [lng, lat]
+        coordinates: [lng, lat] // [Longitude, Latitude]
       },
       capacity,
       hasEmergencyServices,
@@ -66,10 +69,9 @@ export const registerHospital = async (req, res) => {
       adminUserId: savedUser._id
     });
 
-    console.log("Constructed Location:", JSON.stringify(newHospital.location, null, 2));
     await newHospital.save();
 
-    // 3. Auto-Login
+    // --- STEP 3: Success ---
     generateToken(savedUser._id, res);
 
     res.status(201).json({
@@ -82,6 +84,14 @@ export const registerHospital = async (req, res) => {
 
   } catch (error) {
     console.log("Error in registerHospital:", error.message);
+
+    // === ROLLBACK ===
+    // If the hospital failed to save, DELETE the user we just created.
+    if (savedUser) {
+        await User.findByIdAndDelete(savedUser._id);
+        console.log("⚠️ Rolled back orphaned user:", savedUser.email);
+    }
+
     res.status(500).json({ message: "Server Error" });
   }
 };
@@ -98,7 +108,7 @@ export const getMyHospital = async (req, res) => {
   }
 };
 
-// === 3. REQUEST BLOOD (Fixed & Consolidated) ===
+// === 3. REQUEST BLOOD ===
 export const requestBlood = async (req, res) => {
     try {
         const { bloodGroup, units } = req.body;
@@ -116,7 +126,7 @@ export const requestBlood = async (req, res) => {
         const nearbyDonors = await User.find({
             role: 'donor',
             bloodGroup: bloodGroup,
-            isAvailable: true, // <--- IMPORTANT: Only notify available donors
+            isAvailable: true, 
             location: {
                 $near: {
                     $geometry: {
@@ -129,10 +139,14 @@ export const requestBlood = async (req, res) => {
         });
 
         if (nearbyDonors.length === 0) {
-            return res.status(404).json({ message: "No compatible donors found nearby." });
+            return res.status(200).json({ 
+                message: "No compatible donors found nearby.",
+                donorsFound: 0
+            });
         }
 
         // === SEND EMAILS ===
+        // Using Promise.allSettled to ensure one failed email doesn't crash the loop
         const emailResults = await Promise.allSettled(nearbyDonors.map(donor => {
             return sendEmergencyEmail(
                 donor.email,

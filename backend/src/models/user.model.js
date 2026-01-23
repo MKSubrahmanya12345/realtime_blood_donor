@@ -71,7 +71,7 @@ const userSchema = new mongoose.Schema(
         type: String 
     }, // Human readable address (e.g. "Koramangala, Bangalore")
     location: {
-      type: { type: String, default: "Point" },
+      type: { type: String},
       coordinates: { type: [Number], index: "2dsphere" }, // [Longitude, Latitude]
     },
     isAvailable: { type: Boolean, default: true }, 
