@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
-import { Loader, CheckCircle, XCircle } from 'lucide-react';
+import { Loader, CheckCircle, XCircle, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 
 const SignUpPage = () => {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ const SignUpPage = () => {
     email: false,
     phone: false
   });
+  
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -30,7 +32,38 @@ const SignUpPage = () => {
     location: '',
     collegeName: '',
     collegeId: '',
+    address: '',
+    latitude: '',
+    longitude: ''
   });
+
+  const [locationLoading, setLocationLoading] = useState(false);
+
+  //This is function for map system
+
+  const getCurrentLocation = () => {
+    setLocationLoading(true);
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setFormData({
+            ...formData,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          });
+          toast.success("Location fetched!");
+          setLocationLoading(false);
+        },
+        (error) => {
+          toast.error("Could not get location. Allow permissions.");
+          setLocationLoading(false);
+        }
+      );
+    } else {
+      toast.error("GPS not supported");
+      setLocationLoading(false);
+    }
+  };
 
   const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -71,7 +104,6 @@ const SignUpPage = () => {
     <div className="w-full md:w-1/2 p-8">
       <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Create Account</h2>
       
-      {/* Type Toggle */}
       <div className="flex justify-center mb-6 bg-gray-100 p-1 rounded-lg">
          <button onClick={() => setUserType('individual')} className={`flex-1 py-2 px-4 rounded-md text-sm font-semibold transition ${userType === 'individual' ? 'bg-[#8b0000] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Individual</button>
          <button onClick={() => setUserType('college')} className={`flex-1 py-2 px-4 rounded-md text-sm font-semibold transition ${userType === 'college' ? 'bg-[#8b0000] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>College</button>
@@ -96,18 +128,44 @@ const SignUpPage = () => {
         </div>
 
         {userType === 'individual' && (
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-               <label className="block text-sm font-medium text-gray-700">Blood Group</label>
-               <select name="bloodGroup" required onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#8b0000]">
-                 <option value="">Select</option>
-                 {bloodGroups.map(g => <option key={g} value={g}>{g}</option>)}
-               </select>
-            </div>
-            <div>
-               <label className="block text-sm font-medium text-gray-700">City</label>
-               <input type="text" name="location" onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#8b0000]" />
-            </div>
+          <div className="space-y-4">
+             {/* Blood Group */}
+             <div>
+                <label className="block text-sm font-medium text-gray-700">Blood Group</label>
+                <select name="bloodGroup" required onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#8b0000]">
+                  <option value="">Select</option>
+                  {bloodGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+             </div>
+             
+             {/* === FIXED: LOCATION BLOCK === */}
+             <div>
+               <label className="block text-sm font-medium text-gray-700">Location</label>
+               <div className="space-y-2 mt-1">
+                   {/* 1. Human Address Input */}
+                   <input 
+                     type="text" 
+                     name="address" 
+                     placeholder="City / Area Name"
+                     onChange={handleChange}
+                     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#8b0000]" 
+                   />
+                   
+                   {/* 2. GPS Button */}
+                   <button 
+                     type="button" 
+                     onClick={getCurrentLocation}
+                     className={`w-full flex items-center justify-center gap-2 py-2 border rounded-md transition ${
+                        formData.latitude 
+                        ? 'bg-green-50 border-green-500 text-green-700' 
+                        : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'
+                     }`}
+                   >
+                     {locationLoading ? <Loader size={16} className="animate-spin"/> : <MapPin size={16} />}
+                     {formData.latitude ? "Location Captured ✅" : "Detect My Location"}
+                   </button>
+               </div>
+             </div>
           </div>
         )}
 
@@ -131,7 +189,6 @@ const SignUpPage = () => {
     </div>
   );
 
-  // RENDER STEP 2: The OTP Screen
   const renderVerification = () => (
     <div className="w-full md:w-1/2 p-8 flex flex-col justify-center">
       <div className="text-center mb-8">
@@ -142,7 +199,6 @@ const SignUpPage = () => {
         </p>
       </div>
 
-      {/* Email Verification */}
       <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
         <div className="flex justify-between items-center mb-2">
             <label className="font-semibold text-gray-700">Email OTP</label>
@@ -167,7 +223,6 @@ const SignUpPage = () => {
         </div>
       </div>
 
-      {/* Phone Verification */}
       <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
         <div className="flex justify-between items-center mb-2">
             <label className="font-semibold text-gray-700">Phone OTP</label>
@@ -199,8 +254,6 @@ const SignUpPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl w-full bg-white rounded-xl shadow-lg overflow-hidden flex flex-col md:flex-row">
-        
-        {/* LEFT SIDE: Graphics */}
         <div className="hidden md:flex flex-col justify-center items-center w-1/2 bg-[#ffeaea] p-8 text-center">
           <h2 className="text-3xl font-bold text-[#8b0000] mb-4">
             {step === 1 ? "Join the Network" : "Almost There!"}
@@ -211,10 +264,7 @@ const SignUpPage = () => {
                 : "Security checks ensure a safe community for everyone."}
           </p>
         </div>
-
-        {/* RIGHT SIDE: Dynamic Content */}
         {step === 1 ? renderForm() : renderVerification()}
-
       </div>
     </div>
   );

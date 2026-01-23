@@ -44,7 +44,7 @@ const LoginPage = () => {
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-[#8b0000] focus:border-[#8b0000] placeholder-gray-400 transition"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md bg-white text-black rounded-md focus:ring-[#8b0000] focus:border-[#8b0000] placeholder-gray-500 transition"
                   placeholder="you@example.com"
                 />
               </div>
@@ -62,7 +62,7 @@ const LoginPage = () => {
                   required
                   value={formData.password}
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-[#8b0000] focus:border-[#8b0000] placeholder-gray-400 transition"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md bg-white text-black rounded-md focus:ring-[#8b0000] focus:border-[#8b0000] placeholder-gray-500 transition"
                   placeholder="••••••••"
                 />
               </div>
@@ -86,7 +86,7 @@ const LoginPage = () => {
 
           {/* Footer Links */}
           <div className="mt-6 text-center space-y-2">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600"> 
               Don't have an account?{' '}
               <Link to="/signup" className="font-medium text-[#b30000] hover:text-[#8b0000] underline decoration-dotted">
                 Register here

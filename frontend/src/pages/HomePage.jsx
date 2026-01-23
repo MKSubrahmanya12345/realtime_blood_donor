@@ -1,86 +1,114 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
-import { Calendar, Droplet, Clock, MapPin } from 'lucide-react';
+import { axiosInstance } from '../lib/axios';
+import { toast } from 'react-hot-toast';
+import { MapPin, Droplet, Calendar, Shield, Power } from 'lucide-react';
 
 const HomePage = () => {
-  const { authUser } = useAuthStore();
+  const { authUser, checkAuth } = useAuthStore();
+  const [loading, setLoading] = useState(false);
+
+  const handleToggle = async () => {
+    setLoading(true);
+    try {
+      await axiosInstance.put('/auth/toggle-availability');
+      await checkAuth(); // Refresh user data to show new status
+      toast.success(authUser.isAvailable ? "You are now Offline 🔕" : "You are Active to Donate! 🩸");
+    } catch (error) {
+      toast.error("Failed to update status");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 md:p-12">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
         
-        {/* Welcome Banner */}
-        <div className="bg-gradient-to-r from-[#b30000] to-[#800000] rounded-2xl p-8 text-white shadow-xl mb-10">
-           <h1 className="text-3xl md:text-4xl font-bold mb-2">
-             Welcome back, {authUser?.fullName}! 👋
-           </h1>
-           <p className="opacity-90">
-             You are saving lives. Here is your donation overview.
-           </p>
+        {/* WELCOME CARD */}
+        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6">
+           <div>
+              <h1 className="text-3xl font-bold text-gray-800">
+                Welcome, {authUser?.fullName?.split(' ')[0]}! 👋
+              </h1>
+              <p className="text-gray-500 mt-2">
+                Blood Group: <span className="font-bold text-[#b30000] bg-red-50 px-2 py-1 rounded">{authUser?.bloodGroup}</span>
+              </p>
+           </div>
+           
+           {/* STATUS TOGGLE */}
+           <button 
+             onClick={handleToggle}
+             disabled={loading}
+             className={`flex items-center gap-3 px-6 py-3 rounded-xl font-bold transition-all shadow-md ${
+                authUser?.isAvailable 
+                ? 'bg-green-100 text-green-800 hover:bg-green-200 border border-green-200' 
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200 border border-gray-300'
+             }`}
+           >
+             <Power size={20} />
+             {authUser?.isAvailable ? "Status: ACTIVE" : "Status: UNAVAILABLE"}
+           </button>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-           {/* Stat 1 */}
-           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-              <div className="bg-red-100 p-3 rounded-full">
-                 <Droplet className="text-[#b30000] w-8 h-8" fill="currentColor" />
-              </div>
-              <div>
-                 <p className="text-sm text-gray-500 font-medium">Blood Group</p>
-                 <h3 className="text-2xl font-bold text-gray-800">{authUser?.bloodGroup || "N/A"}</h3>
-              </div>
-           </div>
+        {/* INFO GRID */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* Location Card */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div className="bg-blue-50 w-fit p-3 rounded-full mb-4">
+                    <MapPin className="text-blue-600" />
+                </div>
+                <h3 className="font-bold text-gray-800">Your Location</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                    Emergency alerts are based on this GPS point.
+                </p>
+                <div className="mt-4 text-xs font-mono bg-gray-50 p-2 rounded truncate">
+                    {authUser?.location?.coordinates ? 
+                        `${authUser.location.coordinates[1].toFixed(4)}, ${authUser.location.coordinates[0].toFixed(4)}` 
+                        : "No GPS Data"}
+                </div>
+            </div>
 
-           {/* Stat 2 */}
-           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-              <div className="bg-blue-100 p-3 rounded-full">
-                 <Calendar className="text-blue-600 w-8 h-8" />
-              </div>
-              <div>
-                 <p className="text-sm text-gray-500 font-medium">Last Donation</p>
-                 <h3 className="text-xl font-bold text-gray-800">--/--/----</h3>
-              </div>
-           </div>
+            {/* Impact Card */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div className="bg-red-50 w-fit p-3 rounded-full mb-4">
+                    <Droplet className="text-[#b30000]" />
+                </div>
+                <h3 className="font-bold text-gray-800">Donation Impact</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                    Every donation can save up to 3 lives.
+                </p>
+                <div className="mt-4 font-bold text-2xl text-gray-800">
+                    0 <span className="text-sm font-normal text-gray-400">Lives Saved</span>
+                </div>
+            </div>
 
-           {/* Stat 3 */}
-           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-              <div className="bg-green-100 p-3 rounded-full">
-                 <Clock className="text-green-600 w-8 h-8" />
-              </div>
-              <div>
-                 <p className="text-sm text-gray-500 font-medium">Next Eligible</p>
-                 <h3 className="text-xl font-bold text-green-700">Available Now</h3>
-              </div>
-           </div>
+            {/* Next Eligible Date */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div className="bg-purple-50 w-fit p-3 rounded-full mb-4">
+                    <Calendar className="text-purple-600" />
+                </div>
+                <h3 className="font-bold text-gray-800">Next Donation</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                    You are eligible to donate immediately.
+                </p>
+                <button className="mt-4 text-sm text-blue-600 font-bold hover:underline">
+                    Log a recent donation &rarr;
+                </button>
+            </div>
         </div>
 
-        {/* Main Content Area */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">Recent Requests Nearby</h3>
-              <div className="space-y-4">
-                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                       <div className="bg-[#b30000] text-white w-10 h-10 rounded-full flex items-center justify-center font-bold">A+</div>
-                       <div>
-                          <p className="font-semibold text-gray-800">Apollo Hospital</p>
-                          <p className="text-xs text-gray-500 flex items-center gap-1"><MapPin size={12}/> 2.5km away</p>
-                       </div>
-                    </div>
-                    <button className="text-[#b30000] text-sm font-semibold hover:underline">View</button>
-                 </div>
-                 {/* More items... */}
-              </div>
-           </div>
-
-           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">Quick Actions</h3>
-              <div className="grid grid-cols-2 gap-4">
-                 <button className="p-4 bg-red-50 text-[#b30000] rounded-lg font-semibold hover:bg-red-100 transition">Request Blood</button>
-                 <button className="p-4 bg-gray-50 text-gray-700 rounded-lg font-semibold hover:bg-gray-100 transition">Locate Camps</button>
-              </div>
-           </div>
+        {/* RECENT ALERTS BANNER */}
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-6 flex items-start gap-4">
+            <Shield className="text-orange-600 shrink-0 mt-1" />
+            <div>
+                <h3 className="font-bold text-orange-800">System Status: Operational</h3>
+                <p className="text-sm text-orange-700 mt-1">
+                    You are connected to the BloodLink Emergency Network. Keep your phone nearby. 
+                    If a hospital within 10km needs <b>{authUser?.bloodGroup}</b> blood, you will receive an Email alert immediately.
+                </p>
+            </div>
         </div>
 
       </div>

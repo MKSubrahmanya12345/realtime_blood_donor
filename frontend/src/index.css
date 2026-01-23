@@ -1,2 +1,13 @@
 @import "tailwindcss";
 @plugin "daisyui";
+
+@layer base {
+  input, textarea, select {
+    @apply text-gray-900 bg-white border-gray-300;
+  }
+  
+  /* Optional: Make them look nicer when you click them */
+  input:focus, textarea:focus, select:focus {
+    @apply ring-2 ring-[#b30000] border-transparent outline-none;
+  }
+}

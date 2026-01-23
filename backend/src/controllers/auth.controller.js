@@ -13,7 +13,9 @@ export const signup = async (req, res) => {
     password,
     phone,
     bloodGroup,
-    location,
+    address, // This captures the text "Bangalore"
+    latitude, // This captures the number 12.97
+    longitude, // This captures the number 77.59
     collegeName,
     collegeId,
   } = req.body;
@@ -26,11 +28,22 @@ export const signup = async (req, res) => {
     if (password.length < 6) {
       return res
         .status(400)
-        .json({ message: "Password must be atleast 6 characters" });
+        .json({ message: "Password must be at least 6 characters" });
     }
 
     const userExists = await User.findOne({ email });
 
+    // === GEOJSON FORMATTING ===
+    // MongoDB requires [Longitude, Latitude] order
+    let locationData = undefined;
+    if (latitude && longitude) {
+        locationData = {
+            type: "Point",
+            coordinates: [parseFloat(longitude), parseFloat(latitude)]
+        };
+    }
+
+    // === RETRY LOGIC (User Exists but Unverified) ===
     if (userExists) {
       const isVerified =
         userExists.isEmailVerified && userExists.isPhoneVerified;
@@ -51,7 +64,8 @@ export const signup = async (req, res) => {
       userExists.password = hashedPassword;
       userExists.phone = phone;
       userExists.bloodGroup = bloodGroup;
-      userExists.location = location;
+      userExists.address = address;       // Save text address
+      userExists.location = locationData; // Save GeoJSON object
       userExists.collegeName = collegeName;
       userExists.collegeId = collegeId;
       userExists.emailOtp = emailOtp;
@@ -62,7 +76,6 @@ export const signup = async (req, res) => {
 
       await sendEmailOtp(email, emailOtp);
 
-      await sendEmailOtp(email, emailOtp);
       console.log(`=== RETRY OTP for ${email} ===`);
       console.log("Email OTP:", emailOtp);
       console.log("Phone OTP:", phoneOtp);
@@ -74,7 +87,7 @@ export const signup = async (req, res) => {
       });
     }
 
-
+    // === NEW USER CREATION ===
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -87,7 +100,8 @@ export const signup = async (req, res) => {
       password: hashedPassword,
       phone,
       bloodGroup,
-      location,
+      address,       // Save text address
+      location: locationData, // Save GeoJSON object
       collegeName,
       collegeId,
       emailOtp,
@@ -98,6 +112,8 @@ export const signup = async (req, res) => {
     });
 
     await newUser.save();
+    
+    // Send Email
     await sendEmailOtp(email, emailOtp);
 
     // DEV MODE: log OTPs
@@ -165,6 +181,7 @@ export const verifyOtp = async (req, res) => {
             _id: user._id,
             fullName: user.fullName,
             email: user.email,
+            role: user.role,
             profilePic: user.profilePic,
           }
         : null,
@@ -225,7 +242,7 @@ export const logout = (req, res) => {
   }
 };
 
-
+// ================= CHECK AUTH =================
 export const checkAuth = (req, res) => {
   try {
     res.status(200).json(req.user);
@@ -235,6 +252,7 @@ export const checkAuth = (req, res) => {
   }
 };
 
+// ================= UPDATE PROFILE =================
 export const updateProfile = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -266,5 +284,16 @@ export const updateProfile = async (req, res) => {
   } catch (error) {
     console.log("Error in updateProfile:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+export const toggleAvailability = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    user.isAvailable = !user.isAvailable;
+    await user.save();
+    res.status(200).json({ isAvailable: user.isAvailable, message: "Status updated!" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
   }
 };

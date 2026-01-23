@@ -1,7 +1,9 @@
 import React from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, User, Droplet, Menu, X } from 'lucide-react';
+import { LogOut, User, Droplet, Menu, X, Building2 } from 'lucide-react';
+
+
 
 const Navbar = () => {
   const { authUser, logout } = useAuthStore();
@@ -32,6 +34,10 @@ const Navbar = () => {
           <div className="hidden md:flex items-center space-x-8">
             <Link to="/" className="text-gray-600 hover:text-[#b30000] transition">Home</Link>
             <Link to="/about" className="text-gray-600 hover:text-[#b30000] transition">About Us</Link>
+            <Link to="/blood-centers" className="flex items-center gap-1 text-gray-600 hover:text-blue-700 transition font-medium">
+              <Building2 size={18} />
+              <span>Blood Centers</span>
+            </Link>
             
             {authUser ? (
               // === SHOW THIS IF LOGGED IN ===

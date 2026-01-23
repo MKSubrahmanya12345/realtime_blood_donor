@@ -5,6 +5,8 @@ import { connectDB } from "./lib/db.js";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import requestRoutes from "./routes/request.route.js";
+import hospitalRoutes from "./routes/hospital.route.js";
+
 
 dotenv.config();
 
@@ -22,6 +24,8 @@ app.use(cors({
 
 app.use("/api/auth", authRoutes);
 app.use("/api/requests", requestRoutes);
+app.use("/api/hospital", hospitalRoutes);
+
 
 
 
