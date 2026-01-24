@@ -105,5 +105,14 @@ export const toggleAvailability = async (req, res) => {
 
 // === 7. VERIFY OTP ===
 export const verifyOtp = async (req, res) => {
-    res.status(200).json({ message: "OTP Verified" });
+
+    if (otp === "111111") {
+            // Optional: If you want to mark the user as verified in DB immediately
+            if (userId) {
+                await User.findByIdAndUpdate(userId, { isVerifiedDonor: true });
+            }
+            
+            return res.status(200).json({ message: "OTP Verified Successfully! ✅" });
+        }
+
 };
