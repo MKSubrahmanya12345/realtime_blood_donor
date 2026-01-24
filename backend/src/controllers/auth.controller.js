@@ -2,36 +2,82 @@ import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
 import { generateToken } from "../lib/utils.js";
 import mongoose from "mongoose";
+import { sendEmail } from "../lib/email.js"; // Import Email Helper
 
-// === 1. SIGNUP ===
+// === 1. SIGNUP (Hybrid: Sends Real Email + Updates Pending Users) ===
 export const signup = async (req, res) => {
   const { fullName, email, password, role, collegeId, ...otherData } = req.body;
   try {
     if (password.length < 6) return res.status(400).json({ message: "Password must be at least 6 characters" });
 
-    const user = await User.findOne({ email });
-    if (user) return res.status(400).json({ message: "Email already exists" });
+    // 1. Generate a REAL 6-digit Code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    if (role === "college") {
-        const existingCollege = await User.findOne({ fullName: fullName });
-        if (existingCollege) return res.status(400).json({ message: "College name already registered." });
+    // 2. Check Existing User
+    let user = await User.findOne({ email });
+
+    if (user) {
+        if (user.isVerifiedDonor) {
+            return res.status(400).json({ message: "Email already exists" });
+        } else {
+            // === PENDING USER: UPDATE & RESEND ===
+            const salt = await bcrypt.genSalt(10);
+            user.password = await bcrypt.hash(password, salt);
+            user.fullName = fullName;
+            user.role = role;
+            user.verificationCode = verificationCode; // Save New Code
+            
+            // Update College ID if valid
+            if (role !== 'college' && collegeId && mongoose.Types.ObjectId.isValid(collegeId)) {
+                user.collegeId = collegeId;
+            }
+            
+            await user.save();
+
+            // LOG CODE (Backup for Dev)
+            console.log(`[DEV] Real OTP for ${email}: ${verificationCode}`);
+
+            // SEND REAL EMAIL
+            await sendEmail(email, "Verify Your Account", `Code: ${verificationCode}`);
+
+            return res.status(200).json({ 
+                _id: user._id, email: user.email, role: user.role, 
+                message: "Verification code resent" 
+            });
+        }
     }
 
-    let safeCollegeId = undefined;
-    if ((role === 'student' || role === 'donor') && collegeId && mongoose.Types.ObjectId.isValid(collegeId)) {
-        safeCollegeId = collegeId;
-    }
-
+    // 3. NEW USER
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // Safe College ID Check
+    let safeCollegeId = undefined;
+    if (role !== 'college' && collegeId && mongoose.Types.ObjectId.isValid(collegeId)) {
+        safeCollegeId = collegeId;
+    }
+
     const newUser = new User({
-      fullName, email, password: hashedPassword, role, collegeId: safeCollegeId, ...otherData,
+      fullName, email, 
+      password: hashedPassword, 
+      role, 
+      collegeId: safeCollegeId,
+      verificationCode, // Save Real Code
+      ...otherData,
     });
 
     await newUser.save();
-    generateToken(newUser._id, res);
-    res.status(201).json({ _id: newUser._id, fullName: newUser.fullName, email: newUser.email, role: newUser.role });
+
+    // LOG CODE (Backup for Dev)
+    console.log(`[DEV] Real OTP for ${email}: ${verificationCode}`);
+
+    // SEND REAL EMAIL
+    await sendEmail(email, "Verify Your Account", `Code: ${verificationCode}`);
+
+    res.status(201).json({ 
+        _id: newUser._id, email: newUser.email, role: newUser.role,
+        message: "Account created"
+    });
 
   } catch (error) {
     console.log("Error in signup:", error.message);
@@ -39,7 +85,7 @@ export const signup = async (req, res) => {
   }
 };
 
-// === 2. LOGIN (THIS IS THE MISSING PART) ===
+// === 2. LOGIN ===
 export const login = async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -50,7 +96,13 @@ export const login = async (req, res) => {
     if (!isPasswordCorrect) return res.status(400).json({ message: "Invalid credentials" });
 
     generateToken(user._id, res);
-    res.status(200).json({ _id: user._id, fullName: user.fullName, email: user.email, role: user.role, collegeId: user.collegeId });
+    res.status(200).json({ 
+        _id: user._id, 
+        fullName: user.fullName, 
+        email: user.email, 
+        role: user.role, 
+        collegeId: user.collegeId 
+    });
 
   } catch (error) {
     console.log("Error in login:", error.message);
@@ -103,16 +155,39 @@ export const toggleAvailability = async (req, res) => {
     }
 };
 
-// === 7. VERIFY OTP ===
+// === 7. VERIFY OTP (Checks REAL Code OR 111111) ===
 export const verifyOtp = async (req, res) => {
+    try {
+        const { email, otp } = req.body; 
+        const user = await User.findOne({ email });
 
-    if (otp === "111111") {
-            // Optional: If you want to mark the user as verified in DB immediately
-            if (userId) {
-                await User.findByIdAndUpdate(userId, { isVerifiedDonor: true });
-            }
-            
-            return res.status(200).json({ message: "OTP Verified Successfully! ✅" });
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        // === THE HYBRID CHECK ===
+        // Allow if OTP matches the DB code OR if it is the Magic 111111
+        const isValid = (otp === user.verificationCode) || (otp === "111111");
+
+        if (isValid) {
+            user.isVerifiedDonor = true;
+            user.isEmailVerified = true;
+            user.isPhoneVerified = true;
+            user.verificationCode = undefined; // Clear code after use
+            await user.save();
+
+            // LOG IN IMMEDIATELY
+            generateToken(user._id, res);
+
+            return res.status(200).json({ 
+                message: "Verified Successfully! ✅",
+                isFullyVerified: true,
+                user: user,
+            });
         }
 
+        return res.status(400).json({ message: "Invalid OTP" });
+
+    } catch (error) {
+        console.log("Error verifyOtp:", error);
+        res.status(500).json({ message: "Server Error" });
+    }
 };
