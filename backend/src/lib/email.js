@@ -15,36 +15,57 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// === 1. OTP EMAIL (For Login) ===
-export const sendEmailOtp = async (email, otp) => {
-  const mailOptions = {
-    from: `"BloodLink" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: "Your Verification Code",
-    text: `Your verification code is: ${otp}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-        <h2 style="color: #b30000;">BloodLink Verification</h2>
-        <p>Your One-Time Password (OTP) for login is:</p>
-        <h1 style="font-size: 32px; letter-spacing: 2px;">${otp}</h1>
-        <p>This code expires in 10 minutes.</p>
-      </div>
-    `,
-  };
+// === 1. GENERIC EMAIL (Used by Auth Controller) ===
+export const sendEmail = async (to, subject, text) => {
+    // If text contains "Code:", wrap it in the OTP template
+    const isOtp = text.includes("Code:");
+    const otpCode = isOtp ? text.split(': ')[1] : "";
 
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`OTP sent successfully to ${email}`);
-  } catch (error) {
-    console.error(`Error sending OTP to ${email}:`, error);
-  }
+    const htmlContent = isOtp ? `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+        <h2 style="color: #b30000; text-align: center;">BloodLink Verification</h2>
+        <p style="font-size: 16px; color: #333;">Hello,</p>
+        <p style="font-size: 16px; color: #333;">Your verification code is:</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <span style="font-size: 32px; font-weight: bold; color: #b30000; letter-spacing: 5px;">${otpCode}</span>
+        </div>
+        <p style="font-size: 14px; color: #666;">This code will expire in 10 minutes.</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #999; text-align: center;">Thank you for saving lives.<br>The BloodLink Team</p>
+      </div>
+    ` : `
+      <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+        <p>${text}</p>
+      </div>
+    `;
+
+    const mailOptions = {
+        from: `"BloodLink" <${process.env.EMAIL_USER}>`,
+        to,
+        subject,
+        text, // Plain text fallback
+        html: htmlContent
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`Email sent successfully to ${to}`);
+    } catch (error) {
+        console.error(`Error sending email to ${to}:`, error);
+    }
 };
 
-// === 2. EMERGENCY BROADCAST EMAIL (For Hospital Requests) ===
+// === 2. OTP EMAIL (Legacy/Specific Use) ===
+export const sendEmailOtp = async (email, otp) => {
+  // Just reuse the generic one which has the template now
+  await sendEmail(email, "Your Verification Code", `Code: ${otp}`);
+};
+
+// === 3. EMERGENCY BROADCAST EMAIL (For Hospital Requests) ===
 export const sendEmergencyEmail = async (donorEmail, donorName, hospitalName, bloodGroup, units, address, contact) => {
   
-  // Create a clean, safe Google Maps Link
-  const mapLink = `https://www.google.com/maps/search/?api=1&query=$${encodeURIComponent(address)}`;
+  // Create a clean Google Maps Link
+  const mapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
   const mailOptions = {
     from: `"BloodLink Emergency" <${process.env.EMAIL_USER}>`,
