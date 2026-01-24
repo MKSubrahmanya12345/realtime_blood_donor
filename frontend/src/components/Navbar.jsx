@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, User, Droplet, Menu, X, Building2 } from 'lucide-react';
+import { LogOut, User, Droplet, Menu, X, Building2, School } from 'lucide-react';
 
 const Navbar = () => {
   const { authUser, logout } = useAuthStore();
@@ -11,6 +11,18 @@ const Navbar = () => {
   const handleLogout = () => {
     logout();
     navigate('/');
+    setIsOpen(false);
+  };
+
+  // === SAFE DISPLAY NAME HELPER ===
+  const getDisplayName = () => {
+    if (!authUser) return "User";
+
+    if (authUser.role === "college") {
+      return authUser.collegeName || authUser.fullName || "College";
+    }
+
+    return authUser.fullName?.split(" ")[0] || "User";
   };
 
   return (
@@ -30,38 +42,66 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <Link to="/" className="text-gray-600 hover:text-[#b30000]">Home</Link>
-            <Link to="/about" className="text-gray-600 hover:text-[#b30000]">About Us</Link>
-            <Link to="/blood-centers" className="flex items-center gap-1 text-gray-600 hover:text-blue-700 font-medium">
+            <Link to="/" className="text-gray-600 hover:text-[#b30000] transition">
+              Home
+            </Link>
+
+            <Link to="/about" className="text-gray-600 hover:text-[#b30000] transition">
+              About Us
+            </Link>
+
+            <Link
+              to="/blood-centers"
+              className="flex items-center gap-1 text-gray-600 hover:text-blue-700 font-medium transition"
+            >
               <Building2 size={18} />
               Blood Centers
             </Link>
 
             {authUser ? (
               <div className="flex items-center gap-4">
-                <Link to="/profile" className="flex items-center gap-2 text-gray-600 hover:text-[#b30000]">
-                  <User size={20} />
-                  <span className="hidden sm:inline">Profile</span>
-                </Link>
 
-                <div className="flex items-center gap-2 bg-red-50 px-3 py-1.5 rounded-full">
-                  <User size={18} className="text-[#b30000]" />
-                  <span className="text-sm font-semibold text-[#b30000]">
-                    {authUser?.fullName?.split(' ')[0] || "User"}
+                {/* ROLE-AWARE USER CHIP */}
+                <div
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
+                    authUser.role === 'college'
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'bg-red-50 text-[#b30000]'
+                  }`}
+                >
+                  {authUser.role === 'college'
+                    ? <School size={18} />
+                    : <User size={18} />
+                  }
+
+                  <span className="text-sm font-semibold">
+                    {getDisplayName()}
                   </span>
                 </div>
 
-                <button onClick={handleLogout} className="flex items-center gap-2 text-gray-600 hover:text-[#b30000]">
+                {/* LOGOUT */}
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 text-gray-600 hover:text-[#b30000] transition font-medium"
+                >
                   <LogOut size={20} />
-                  Logout
+                  <span>Logout</span>
                 </button>
+
               </div>
             ) : (
               <div className="flex items-center gap-4">
-                <Link to="/login" className="text-gray-700 hover:text-[#b30000]">
+                <Link
+                  to="/login"
+                  className="text-gray-700 hover:text-[#b30000] transition"
+                >
                   Login
                 </Link>
-                <Link to="/signup" className="bg-[#b30000] text-white px-5 py-2 rounded-full hover:bg-[#8b0000]">
+
+                <Link
+                  to="/signup"
+                  className="bg-[#b30000] text-white px-5 py-2 rounded-full hover:bg-[#8b0000] transition"
+                >
                   Donate Now
                 </Link>
               </div>
@@ -69,34 +109,79 @@ const Navbar = () => {
           </div>
 
           {/* Mobile Menu Button */}
-          <button onClick={() => setIsOpen(!isOpen)} className="md:hidden text-gray-600">
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="md:hidden text-gray-600"
+          >
             {isOpen ? <X size={28} /> : <Menu size={28} />}
           </button>
+
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* === MOBILE MENU === */}
       {isOpen && (
         <div className="md:hidden bg-white border-t p-4 space-y-4">
-          <Link to="/" className="block">Home</Link>
-          <Link to="/about" className="block">About Us</Link>
-          <Link to="/blood-centers" className="block">Blood Centers</Link>
+
+          {/* Core Nav Links */}
+          <Link
+            to="/"
+            onClick={() => setIsOpen(false)}
+            className="block text-gray-700"
+          >
+            Home
+          </Link>
+
+          <Link
+            to="/about"
+            onClick={() => setIsOpen(false)}
+            className="block text-gray-700"
+          >
+            About Us
+          </Link>
+
+          <Link
+            to="/blood-centers"
+            onClick={() => setIsOpen(false)}
+            className="block text-gray-700"
+          >
+            Blood Centers
+          </Link>
 
           {authUser ? (
             <>
+              {/* ROLE-SAFE GREETING */}
               <p className="font-bold text-[#b30000]">
-                Hello, {authUser?.fullName || "User"}
+                Hello, {getDisplayName()}
               </p>
-              <button onClick={handleLogout} className="block w-full text-left text-gray-600">
+
+              <button
+                onClick={handleLogout}
+                className="block w-full text-left text-gray-600"
+              >
                 Logout
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" className="block text-gray-600">Login</Link>
-              <Link to="/signup" className="block text-[#b30000] font-bold">Donate Now</Link>
+              <Link
+                to="/login"
+                onClick={() => setIsOpen(false)}
+                className="block text-gray-600"
+              >
+                Login
+              </Link>
+
+              <Link
+                to="/signup"
+                onClick={() => setIsOpen(false)}
+                className="block text-[#b30000] font-bold"
+              >
+                Donate Now
+              </Link>
             </>
           )}
+
         </div>
       )}
     </header>

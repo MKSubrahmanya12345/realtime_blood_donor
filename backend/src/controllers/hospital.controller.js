@@ -162,3 +162,68 @@ export const requestBlood = async (req, res) => {
         res.status(500).json({ message: "Server Error" });
     }
 };
+
+
+
+// === 4. UPDATE HOSPITAL LOCATION ===
+export const updateHospitalLocation = async (req, res) => {
+  try {
+    const { latitude, longitude } = req.body;
+    
+    // Find the hospital managed by the logged-in user
+    const hospital = await Hospital.findOne({ adminUserId: req.user._id });
+
+    if (!hospital) {
+        return res.status(404).json({ message: "Hospital profile not found" });
+    }
+
+    // Update the GeoJSON location
+    hospital.location = {
+        type: "Point",
+        coordinates: [parseFloat(longitude), parseFloat(latitude)] // [Lng, Lat]
+    };
+
+    await hospital.save();
+
+    res.status(200).json({ 
+        message: "Hospital location updated successfully!", 
+        location: hospital.location 
+    });
+
+  } catch (error) {
+    console.log("Error in updateHospitalLocation:", error.message);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+
+export const updateInventory = async (req, res) => {
+  try {
+    const { inventory } = req.body; // Expecting object like { 'A+': 10, 'B-': 5 ... }
+    
+    const hospital = await Hospital.findOne({ adminUserId: req.user._id });
+
+    if (!hospital) {
+        return res.status(404).json({ message: "Hospital not found" });
+    }
+
+    // Update inventory
+    hospital.inventory = inventory;
+    
+    // Recalculate total units automatically
+    const total = Object.values(inventory).reduce((acc, curr) => acc + Number(curr), 0);
+    hospital.totalBloodUnits = total;
+
+    await hospital.save();
+
+    res.status(200).json({ 
+        message: "Inventory updated successfully!", 
+        inventory: hospital.inventory,
+        totalBloodUnits: hospital.totalBloodUnits
+    });
+
+  } catch (error) {
+    console.log("Error in updateInventory:", error.message);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
