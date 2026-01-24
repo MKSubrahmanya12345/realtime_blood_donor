@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import { toast } from "react-hot-toast";
+import { io } from "socket.io-client"; // Import Socket Client
+
+// === CRITICAL FIX: Define Backend URL for Socket ===
+const BASE_URL = import.meta.env.MODE === "development" 
+  ? "http://localhost:3000" 
+  : "https://bloodlink-4edh.onrender.com"; // Your Render Backend URL
 
 export const useAuthStore = create((set, get) => ({
     authUser: null,
@@ -8,14 +14,21 @@ export const useAuthStore = create((set, get) => ({
     isLoggingIn: false,
     isCheckingAuth: true,
     isVerifying: false, // For OTP loading
+    
+    // Socket State
+    socket: null,
+    onlineUsers: [],
 
     // === 1. CHECK AUTH (On Page Load) ===
     checkAuth: async () => {
         try {
             const res = await axiosInstance.get("/auth/check");
             set({ authUser: res.data });
+            
+            // Connect socket if user is authenticated
+            get().connectSocket();
 
-            // If the backend sends a fresh token/location, update it
+            // If the backend sends a fresh token, update it
             if (res.data.token) {
                 localStorage.setItem("jwt", res.data.token);
             }
@@ -56,6 +69,10 @@ export const useAuthStore = create((set, get) => ({
 
                 set({ authUser: res.data.user });
                 toast.success("Verification Complete! Welcome.");
+                
+                // Connect socket after successful verification
+                get().connectSocket();
+
                 return "SUCCESS";
             } else {
                 toast.success(`${type === "email" ? "Email" : "Phone"} verified!`);
@@ -75,7 +92,7 @@ export const useAuthStore = create((set, get) => ({
         try {
             const res = await axiosInstance.post("/auth/login", data);
 
-            // CRITICAL FIX: Save Token to LocalStorage
+            // Save Token to LocalStorage
             if (res.data.token) {
                 localStorage.setItem("jwt", res.data.token);
             }
@@ -83,8 +100,8 @@ export const useAuthStore = create((set, get) => ({
             set({ authUser: res.data });
             toast.success("Welcome back!");
 
-            // Connect Socket (if you have it implemented)
-            // get().connectSocket(); 
+            // Connect Socket
+            get().connectSocket(); 
 
             return res.data;
         } catch (error) {
@@ -101,30 +118,58 @@ export const useAuthStore = create((set, get) => ({
         } catch (error) {
             console.log("Backend logout error (ignoring):", error);
         } finally {
-            // ALWAYS clear these, even if the server request fails
+            // ALWAYS clear these
             localStorage.removeItem("jwt");
             set({ authUser: null });
+            get().disconnectSocket(); // Disconnect socket
             toast.success("Logged out successfully");
         }
     },
 
-    // === 6. TOGGLE AVAILABILITY ===
+    // === 6. SOCKET CONNECTION (The Fix) ===
+    connectSocket: () => {
+        const { authUser, socket } = get();
+        
+        // If not logged in or already connected, skip
+        if (!authUser || (socket && socket.connected)) return;
+
+        // Connect explicitly to the Backend URL
+        const newSocket = io(BASE_URL, {
+            query: {
+                userId: authUser._id,
+            },
+        });
+
+        newSocket.connect();
+        set({ socket: newSocket });
+
+        // Listen for online users update
+        newSocket.on("getOnlineUsers", (userIds) => {
+            set({ onlineUsers: userIds });
+        });
+    },
+
+    disconnectSocket: () => {
+        const { socket } = get();
+        if (socket?.connected) socket.disconnect();
+        set({ socket: null });
+    },
+
+    // === 7. TOGGLE AVAILABILITY ===
     toggleAvailability: async () => {
         try {
             const { authUser } = get();
             if (!authUser) return;
 
-            // Optimistic UI Update (Instant toggle)
+            // Optimistic UI Update
             const newStatus = !authUser.isAvailable;
             set({ authUser: { ...authUser, isAvailable: newStatus } });
 
-            // Send to Backend
-            const res = await axiosInstance.put("/auth/update-profile", {
-                isAvailable: newStatus
-            });
+            // Send to Backend (Route corrected to toggle-availability if that's what backend uses)
+            const res = await axiosInstance.put("/auth/toggle-availability"); 
 
             // Sync with Server Response
-            set({ authUser: res.data.user });
+            set({ authUser: res.data.user || { ...authUser, isAvailable: res.data.isAvailable } });
 
             toast.success(newStatus ? "You are now Active!" : "You are now Unavailable");
 
@@ -140,34 +185,38 @@ export const useAuthStore = create((set, get) => ({
         }
     },
 
-    // === 7. UPDATE LOCATION (Helper) ===
+    // === 8. UPDATE LOCATION (Helper) ===
     updateLocation: async (lat, lng) => {
         try {
-            const res = await axiosInstance.put("/auth/update-profile", {
-                latitude: lat,
-                longitude: lng
+            const res = await axiosInstance.put("/auth/profile", {
+                location: {
+                    type: "Point",
+                    coordinates: [lng, lat] // MongoDB expects [lng, lat]
+                }
             });
-            set({ authUser: res.data.user });
+            set({ authUser: res.data });
             toast.success("Location Updated!");
         } catch (error) {
+            console.log("Loc update err:", error);
             toast.error("Failed to update location");
         }
     },
 
-    // === 8. REGISTER COLLEGE (NEW + TOKEN FIX) ===
+    // === 9. REGISTER COLLEGE ===
     registerCollege: async (data) => {
         set({ isSigningUp: true });
         try {
             const res = await axiosInstance.post("/college/register", data);
 
-            // Save Token & User immediately
             if (res.data.token) {
                 localStorage.setItem("jwt", res.data.token);
             }
 
             set({ authUser: res.data });
-
             toast.success("College Partner Registered!");
+            
+            get().connectSocket(); // Connect socket for college too
+
             return res.data;
         } catch (error) {
             toast.error(error.response?.data?.message || "Registration failed");
