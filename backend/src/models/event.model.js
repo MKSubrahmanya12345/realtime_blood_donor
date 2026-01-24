@@ -11,6 +11,7 @@ const eventSchema = new mongoose.Schema({
     required: true 
   },
   
+  numberOfDays: { type: Number, default: 1 },
   location: { type: String }, // Specific hall/room
   
   // Students who joined/registered for this event
@@ -23,8 +24,17 @@ const eventSchema = new mongoose.Schema({
     type: String,
     enum: ["Upcoming", "Active", "Completed"], // "Active" = Today
     default: "Upcoming"
-  }
-}, { timestamps: true });
+  },
+  organizerName: { type: String, required: true },
+  contactNumber: { type: String, required: true },
+  participants: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+}, 
+{ timestamps: true });
 
 const Event = mongoose.model("Event", eventSchema);
 export default Event;

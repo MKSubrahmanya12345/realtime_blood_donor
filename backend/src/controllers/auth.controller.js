@@ -188,7 +188,8 @@ export const verifyOtp = async (req, res) => {
             email: user.email,
             role: user.role,
             profilePic: user.profilePic,
-            isAvailable: user.isAvailable, // <--- Sent to Frontend
+            isAvailable: user.isAvailable, 
+            bloodGroup: user.bloodGroup,// <--- Sent to Frontend
             location: user.location,       // <--- Sent to Frontend
           }
         : null,
@@ -231,6 +232,7 @@ export const login = async (req, res) => {
       fullName: user.fullName,
       email: user.email,
       profilePic: user.profilePic,
+      bloodGroup: user.bloodGroup,
       role: user.role,
       isAvailable: user.isAvailable, // <--- FIX: Send Status
       location: user.location,
@@ -330,7 +332,9 @@ export const checkAuth = async (req, res) => {
         role: user.role,
         profilePic: user.profilePic,
         isAvailable: user.isAvailable, // <--- FIX: Send Status
-        location: user.location,       // <--- FIX: Send Location
+        location: user.location,
+        bloodGroup: user.bloodGroup,
+        token: user.token,      // <--- FIX: Send Location
     });
   } catch (error) {
     console.log("Error in checkAuth controller", error.message);
