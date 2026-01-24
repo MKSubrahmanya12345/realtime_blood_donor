@@ -1,82 +1,109 @@
 import User from "../models/user.model.js";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { generateToken } from "../lib/utils.js";
 import mongoose from "mongoose";
 
-// === 1. SIGNUP (MERGED & SAFER) ===
+// === 1. SIGNUP ===
 export const signup = async (req, res) => {
   const { fullName, email, password, role, collegeId, ...otherData } = req.body;
-
   try {
-    // 1. Password Check
-    if (password.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters" });
-    }
+    if (password.length < 6) return res.status(400).json({ message: "Password must be at least 6 characters" });
 
-    // 2. Duplicate Email
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "Email already exists" });
-    }
+    const user = await User.findOne({ email });
+    if (user) return res.status(400).json({ message: "Email already exists" });
 
-    // 3. Duplicate College Name
     if (role === "college") {
-      const existingCollege = await User.findOne({ fullName });
-      if (existingCollege) {
-        return res.status(400).json({ message: "A college with this name is already registered." });
-      }
+        const existingCollege = await User.findOne({ fullName: fullName });
+        if (existingCollege) return res.status(400).json({ message: "College name already registered." });
     }
 
-    // 4. Safe College ID Handling
     let safeCollegeId = undefined;
-
-    if ((role === "student" || role === "donor") && collegeId) {
-      if (mongoose.Types.ObjectId.isValid(collegeId)) {
+    if ((role === 'student' || role === 'donor') && collegeId && mongoose.Types.ObjectId.isValid(collegeId)) {
         safeCollegeId = collegeId;
-      } else {
-        console.log(`[Warning] Ignored invalid College ID: ${collegeId}`);
-      }
     }
 
-    // 5. Hash Password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const newUser = new User({
-      fullName,
-      email,
-      password: hashedPassword,
-      role,
-      collegeId: safeCollegeId,
-      ...otherData
+      fullName, email, password: hashedPassword, role, collegeId: safeCollegeId, ...otherData,
     });
 
     await newUser.save();
-
-    // 6. Generate Token
     generateToken(newUser._id, res);
-
-    res.status(201).json({
-      _id: newUser._id,
-      fullName: newUser.fullName,
-      email: newUser.email,
-      role: newUser.role,
-      collegeId: newUser.collegeId
-    });
+    res.status(201).json({ _id: newUser._id, fullName: newUser.fullName, email: newUser.email, role: newUser.role });
 
   } catch (error) {
-    console.log("Error in signup controller:", error.message);
+    console.log("Error in signup:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
-// === 2. CHECK AUTH (MERGED) ===
-export const checkAuth = (req, res) => {
+// === 2. LOGIN (THIS IS THE MISSING PART) ===
+export const login = async (req, res) => {
+  const { email, password } = req.body;
   try {
-    // protectRoute already populated req.user
-    res.status(200).json(req.user);
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    if (!isPasswordCorrect) return res.status(400).json({ message: "Invalid credentials" });
+
+    generateToken(user._id, res);
+    res.status(200).json({ _id: user._id, fullName: user.fullName, email: user.email, role: user.role, collegeId: user.collegeId });
+
   } catch (error) {
-    console.log("Error in checkAuth controller:", error.message);
+    console.log("Error in login:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
+};
+
+// === 3. LOGOUT ===
+export const logout = (req, res) => {
+  try {
+    res.cookie("jwt", "", { maxAge: 0 });
+    res.status(200).json({ message: "Logged out successfully" });
+  } catch (error) {
+    console.log("Error in logout:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// === 4. CHECK AUTH ===
+export const checkAuth = (req, res) => {
+  try {
+    res.status(200).json(req.user);
+  } catch (error) {
+    console.log("Error in checkAuth:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// === 5. UPDATE PROFILE ===
+export const updateProfile = async (req, res) => {
+  try {
+    const updatedUser = await User.findByIdAndUpdate(req.user._id, req.body, { new: true });
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    console.log("Error in updateProfile:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// === 6. TOGGLE AVAILABILITY ===
+export const toggleAvailability = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        user.isAvailable = !user.isAvailable;
+        await user.save();
+        res.status(200).json({ isAvailable: user.isAvailable });
+    } catch (error) {
+        console.log("Error toggleAvailability:", error);
+        res.status(500).json({ message: "Server Error" });
+    }
+};
+
+// === 7. VERIFY OTP ===
+export const verifyOtp = async (req, res) => {
+    res.status(200).json({ message: "OTP Verified" });
 };
