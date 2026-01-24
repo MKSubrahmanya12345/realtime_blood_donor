@@ -7,22 +7,36 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173"],
+    // === CRITICAL FIX: Allow Vercel Frontend ===
+    origin: [
+        "http://localhost:5173",
+        "https://bloodlink-pi.vercel.app" 
+    ],
+    methods: ["GET", "POST"], 
+    credentials: true
   },
 });
 
-const userSocketMap = {}; // {userId: socketId}
+// Map to store {userId: socketId}
+const userSocketMap = {}; 
 
 export const getReceiverSocketId = (userId) => {
   return userSocketMap[userId];
 };
 
 io.on("connection", (socket) => {
+  console.log("A user connected", socket.id);
+
   const userId = socket.handshake.query.userId;
   if (userId) userSocketMap[userId] = socket.id;
 
+  // Broadcast online users to everyone
+  io.emit("getOnlineUsers", Object.keys(userSocketMap));
+
   socket.on("disconnect", () => {
-    if (userId) delete userSocketMap[userId];
+    console.log("A user disconnected", socket.id);
+    delete userSocketMap[userId];
+    io.emit("getOnlineUsers", Object.keys(userSocketMap));
   });
 });
 
