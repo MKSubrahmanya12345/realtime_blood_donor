@@ -63,3 +63,14 @@ export const signup = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+export const checkAuth = (req, res) => {
+  try {
+    // Because of the 'protectRoute' middleware, if we get here, 
+    // req.user is already populated and valid.
+    res.status(200).json(req.user);
+  } catch (error) {
+    console.log("Error in checkAuth controller", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
