@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 
 const HomePage = () => {
-  const { authUser } = useAuthStore();
+  // 1. ADD checkAuth HERE
+  const { authUser, checkAuth } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [events, setEvents] = useState([]);
@@ -35,6 +36,20 @@ const HomePage = () => {
     fetchNotifications();
     fetchEvents();
   }, []);
+
+  // 2. RESTORE THE MISSING TOGGLE FUNCTION
+  const handleToggleStatus = async () => {
+    setLoading(true);
+    try {
+      await axiosInstance.put('/auth/toggle-availability');
+      await checkAuth(); // Refresh user data to show new status
+      toast.success(authUser.isAvailable ? "You are now Offline 🔕" : "You are Active to Donate! 🩸");
+    } catch (error) {
+      toast.error("Failed to update status");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleToggleEvent = async (eventId, isRegistered) => {
     try {
@@ -73,6 +88,7 @@ const HomePage = () => {
           </div>
 
           <button
+            onClick={handleToggleStatus} // 3. RE-ATTACH THE CLICK HANDLER
             disabled={loading}
             className={`flex items-center gap-3 px-6 py-3 rounded-xl font-bold transition-all shadow-md ${
               authUser?.isAvailable
@@ -85,6 +101,8 @@ const HomePage = () => {
           </button>
         </div>
 
+        {/* ... Rest of your code (Metrics, Notifications, Events) remains exactly the same ... */}
+        
         {/* === SECTION 2: METRICS === */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">

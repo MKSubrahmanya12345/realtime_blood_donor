@@ -45,6 +45,21 @@ export const createEvent = async (req, res) => {
 // === 2. GET ALL EVENTS (Public - For Donors) ===
 export const getAllEvents = async (req, res) => {
   try {
+
+    if (!req.user) {
+        return res.status(200).json([]); // Or throw error: "Please login to see events"
+    }
+
+    if (req.user.role === 'college') {
+        const events = await Event.find({ collegeId: req.user._id }).sort({ date: 1 });
+        return res.status(200).json(events);
+    }
+
+    if (req.user.collegeId) {
+        const events = await Event.find({ collegeId: req.user.collegeId }).sort({ date: 1 });
+        return res.status(200).json(events);
+    }
+    
     const events = await Event.find().sort({ date: 1 });
     res.status(200).json(events);
   } catch (error) {

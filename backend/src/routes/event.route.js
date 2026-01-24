@@ -15,7 +15,7 @@ const router = express.Router();
 router.post("/create", protectRoute, createEvent);
 
 // 2. Get All Events (Public - for Donors to see)
-router.get("/all", getAllEvents);
+router.get("/all", protectRoute, getAllEvents);
 
 // 3. Get My Events (Private - for College Dashboard)
 router.get("/my-events", protectRoute, getMyEvents);

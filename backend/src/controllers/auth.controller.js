@@ -32,6 +32,13 @@ export const signup = async (req, res) => {
         .json({ message: "Password must be at least 6 characters" });
     }
 
+    if (role === "college") {
+        const existingCollege = await User.findOne({ collegeName: fullName }); // Assuming fullName is used as collegeName
+        if (existingCollege) {
+            return res.status(400).json({ message: "A college with this name is already registered." });
+        }
+    }
+
     const userExists = await User.findOne({ email });
 
     // === GEOJSON FORMATTING ===
