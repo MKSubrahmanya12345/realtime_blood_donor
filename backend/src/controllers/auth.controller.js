@@ -1,36 +1,41 @@
-import mongoose from "mongoose"; // Don't forget to import this!
+import User from "../models/user.model.js";
+import bcrypt from "bcrypt";
+import { generateToken } from "../lib/utils.js";
+import mongoose from "mongoose";
 
+// === 1. SIGNUP (MERGED & SAFER) ===
 export const signup = async (req, res) => {
   const { fullName, email, password, role, collegeId, ...otherData } = req.body;
+
   try {
-    // 1. Check Password
+    // 1. Password Check
     if (password.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
-    // 2. Check Duplicate Email
-    const user = await User.findOne({ email });
-    if (user) return res.status(400).json({ message: "Email already exists" });
-
-    // 3. Validate College Name (if signing up as a College)
-    if (role === "college") {
-        const existingCollege = await User.findOne({ fullName: fullName }); // Check existing names
-        if (existingCollege) {
-            return res.status(400).json({ message: "A college with this name is already registered." });
-        }
+    // 2. Duplicate Email
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "Email already exists" });
     }
 
-    // 4. SAFER COLLEGE ID HANDLING (Fixes the 500 Crash)
+    // 3. Duplicate College Name
+    if (role === "college") {
+      const existingCollege = await User.findOne({ fullName });
+      if (existingCollege) {
+        return res.status(400).json({ message: "A college with this name is already registered." });
+      }
+    }
+
+    // 4. Safe College ID Handling
     let safeCollegeId = undefined;
-    
-    // Only try to save collegeId if it's a valid MongoDB ID
-    if ((role === 'student' || role === 'donor') && collegeId) {
-        if (mongoose.Types.ObjectId.isValid(collegeId)) {
-            safeCollegeId = collegeId;
-        } else {
-            console.log(`[Warning] Ignored invalid College ID: ${collegeId}`);
-            // We ignore the bad ID instead of crashing
-        }
+
+    if ((role === "student" || role === "donor") && collegeId) {
+      if (mongoose.Types.ObjectId.isValid(collegeId)) {
+        safeCollegeId = collegeId;
+      } else {
+        console.log(`[Warning] Ignored invalid College ID: ${collegeId}`);
+      }
     }
 
     // 5. Hash Password
@@ -42,14 +47,15 @@ export const signup = async (req, res) => {
       email,
       password: hashedPassword,
       role,
-      collegeId: safeCollegeId, // Use the safe version
-      ...otherData,
+      collegeId: safeCollegeId,
+      ...otherData
     });
 
     await newUser.save();
 
-    // 6. Generate Token & Reply
+    // 6. Generate Token
     generateToken(newUser._id, res);
+
     res.status(201).json({
       _id: newUser._id,
       fullName: newUser.fullName,
@@ -59,18 +65,18 @@ export const signup = async (req, res) => {
     });
 
   } catch (error) {
-    console.log("Error in signup controller", error.message);
+    console.log("Error in signup controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
+// === 2. CHECK AUTH (MERGED) ===
 export const checkAuth = (req, res) => {
   try {
-    // Because of the 'protectRoute' middleware, if we get here, 
-    // req.user is already populated and valid.
+    // protectRoute already populated req.user
     res.status(200).json(req.user);
   } catch (error) {
-    console.log("Error in checkAuth controller", error.message);
+    console.log("Error in checkAuth controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
