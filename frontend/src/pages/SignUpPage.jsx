@@ -1,9 +1,68 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { axiosInstance } from '../lib/axios';
-import { Loader, CheckCircle, MapPin, School, User } from 'lucide-react';
+import { Loader, CheckCircle, MapPin, Navigation, School, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+
+// === MAP IMPORTS ===
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// Fix for default Leaflet marker icons
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+let DefaultIcon = L.icon({
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
+
+// === HELPER: RECENTER MAP ===
+const RecenterMap = ({ lat, lng }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (lat && lng) {
+      map.setView([lat, lng], 15);
+    }
+  }, [lat, lng, map]);
+  return null;
+};
+
+// === COMPONENT: DRAGGABLE MARKER ===
+function DraggableMarker({ position, setFormData }) {
+  const markerRef = useRef(null);
+
+  const eventHandlers = useMemo(
+    () => ({
+      dragend() {
+        const marker = markerRef.current;
+        if (marker) {
+          const { lat, lng } = marker.getLatLng();
+          setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }));
+        }
+      }
+    }),
+    [setFormData]
+  );
+
+  return (
+    <Marker
+      draggable
+      eventHandlers={eventHandlers}
+      position={[position.lat, position.lng]}
+      ref={markerRef}
+    >
+      <Popup minWidth={90}>
+        <span>Drag to your exact location</span>
+      </Popup>
+    </Marker>
+  );
+}
 
 const SignUpPage = () => {
   const navigate = useNavigate();
@@ -30,23 +89,22 @@ const SignUpPage = () => {
     password: '',
     phone: '',
     bloodGroup: '',
-    location: '',
-    collegeName: '',
-    collegeId: '',
     address: '',
-    latitude: '',
-    longitude: ''
+    latitude: null,
+    longitude: null,
+    collegeName: '',
+    collegeId: ''
   });
 
   const [locationLoading, setLocationLoading] = useState(false);
 
-  // === FETCH COLLEGES ON LOAD ===
+  // === FETCH COLLEGES ===
   useEffect(() => {
     const fetchColleges = async () => {
       try {
         const res = await axiosInstance.get('/college/all');
         setColleges(res.data);
-      } catch (error) {
+      } catch {
         console.error("Failed to load colleges");
       }
     };
@@ -58,36 +116,38 @@ const SignUpPage = () => {
     setLocationLoading(true);
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        position => {
           setFormData(prev => ({
             ...prev,
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
           }));
-          toast.success("Location fetched!");
+          toast.success("GPS Location Captured!");
           setLocationLoading(false);
         },
         () => {
-          toast.error("Could not get location. Allow permissions.");
+          toast.error("Could not fetch location. Please use the map.");
           setLocationLoading(false);
         }
       );
-    } else {
-      toast.error("GPS not supported");
-      setLocationLoading(false);
     }
   };
 
   const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
-  const handleChange = (e) => {
+  const handleChange = e =>
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  };
 
   // === STEP 1: SUBMIT REGISTRATION ===
-  const handleSignup = async (e) => {
+  const handleSignup = async e => {
     e.preventDefault();
 
+    // Snehi logic: individuals must pin GPS
+    if (userType === 'individual' && !formData.latitude) {
+      return toast.error("Please pin your location on the map.");
+    }
+
+    // Main logic: students must give college info
     if (userType === 'student' && (!formData.collegeName || !formData.collegeId)) {
       return toast.error("Please provide College Name and ID");
     }
@@ -100,7 +160,7 @@ const SignUpPage = () => {
   };
 
   // === STEP 2: VERIFY OTP ===
-  const handleVerify = async (type) => {
+  const handleVerify = async type => {
     const otp = type === 'email' ? emailOtp : phoneOtp;
     if (!otp) return;
 
@@ -116,14 +176,15 @@ const SignUpPage = () => {
   // --- RENDER HELPERS ---
 
   const renderForm = () => (
-    <div className="w-full md:w-1/2 p-8">
+    <div className="w-full md:w-1/2 p-8 overflow-y-auto max-h-[90vh]">
       <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
         Create Donor Account
       </h2>
 
-      {/* TOGGLE: General vs Student */}
+      {/* TOGGLE */}
       <div className="flex justify-center gap-4 mb-6">
         <button
+          type="button"
           onClick={() => setUserType('individual')}
           className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition border-2 ${
             userType === 'individual'
@@ -135,6 +196,7 @@ const SignUpPage = () => {
         </button>
 
         <button
+          type="button"
           onClick={() => setUserType('student')}
           className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition border-2 ${
             userType === 'student'
@@ -156,7 +218,7 @@ const SignUpPage = () => {
             name="fullName"
             required
             onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-[#8b0000] focus:border-[#8b0000] outline-none"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-[#8b0000] outline-none"
           />
         </div>
 
@@ -167,7 +229,7 @@ const SignUpPage = () => {
             name="email"
             required
             onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-[#8b0000] focus:border-[#8b0000] outline-none"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-[#8b0000] outline-none"
           />
         </div>
 
@@ -178,7 +240,7 @@ const SignUpPage = () => {
             name="password"
             required
             onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-[#8b0000] focus:border-[#8b0000] outline-none"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-[#8b0000] outline-none"
           />
         </div>
 
@@ -189,7 +251,7 @@ const SignUpPage = () => {
             name="phone"
             required
             onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-[#8b0000] focus:border-[#8b0000] outline-none"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-[#8b0000] outline-none"
           />
         </div>
 
@@ -209,36 +271,46 @@ const SignUpPage = () => {
           </select>
         </div>
 
-        {/* LOCATION */}
-        <div>
-          <label className="block text-sm font-bold text-gray-700">Current Location</label>
-          <div className="space-y-2 mt-1">
-            <input
-              type="text"
-              name="address"
-              placeholder="City / Area / Hostel Name"
-              required
-              onChange={handleChange}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-[#8b0000] outline-none"
-            />
+        {/* MAP SECTION */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <label className="block text-sm font-bold text-gray-700">
+              Capture Your Location
+            </label>
 
             <button
               type="button"
               onClick={getCurrentLocation}
-              className={`w-full flex items-center justify-center gap-2 py-2 border rounded-lg transition font-medium ${
-                formData.latitude
-                  ? 'bg-green-50 border-green-500 text-green-700'
-                  : 'bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100'
-              }`}
+              className="text-xs font-bold text-[#8b0000] flex items-center gap-1 hover:underline"
             >
               {locationLoading
-                ? <Loader size={16} className="animate-spin" />
-                : <MapPin size={16} />}
-              {formData.latitude
-                ? "GPS Captured Successfully ✅"
-                : "Auto-Detect My GPS"}
+                ? <Loader size={12} className="animate-spin" />
+                : <Navigation size={12} />}
+              Detect via GPS
             </button>
           </div>
+
+          <div className="h-64 w-full rounded-xl overflow-hidden border-2 border-gray-200 relative z-0">
+            <MapContainer
+              center={[formData.latitude || 12.9716, formData.longitude || 77.5946]}
+              zoom={13}
+              style={{ height: "100%", width: "100%" }}
+            >
+              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <RecenterMap lat={formData.latitude} lng={formData.longitude} />
+
+              {formData.latitude && (
+                <DraggableMarker
+                  position={{ lat: formData.latitude, lng: formData.longitude }}
+                  setFormData={setFormData}
+                />
+              )}
+            </MapContainer>
+          </div>
+
+          <p className="text-[10px] text-gray-500 italic text-center">
+            *Click GPS to find you, then drag the pin to your exact home.
+          </p>
         </div>
 
         {/* STUDENT FIELDS */}
@@ -368,7 +440,6 @@ const SignUpPage = () => {
           </button>
         </div>
       </div>
-
     </div>
   );
 
