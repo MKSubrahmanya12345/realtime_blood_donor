@@ -6,6 +6,8 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import requestRoutes from "./routes/request.route.js";
 import hospitalRoutes from "./routes/hospital.route.js";
+import collegeRoutes from "./routes/college.route.js";
+import eventRoutes from "./routes/event.route.js";
 
 
 dotenv.config();
@@ -26,6 +28,8 @@ app.use(cors({
 app.use("/api/auth", authRoutes);
 app.use("/api/requests", requestRoutes);
 app.use("/api/hospital", hospitalRoutes);
+app.use("/api/events", eventRoutes);
+app.use("/api/college", collegeRoutes);
 
 
 

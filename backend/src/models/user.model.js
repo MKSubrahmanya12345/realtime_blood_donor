@@ -75,8 +75,17 @@ const userSchema = new mongoose.Schema(
       coordinates: { type: [Number], index: "2dsphere" }, // [Longitude, Latitude]
     },
     isAvailable: { type: Boolean, default: true }, 
-        lastDonationDate: { type: Date, default: null },
+        lastDonationDate: { type: Date, default: null 
+
+    },
+    isVerifiedDonor: { 
+      type: Boolean, 
+      default: false 
+    },
+        
   },
+
+  
   {
     timestamps: true,
   },

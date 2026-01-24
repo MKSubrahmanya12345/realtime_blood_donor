@@ -59,12 +59,16 @@ const HospitalDashboard = () => {
   // MAP STATE
   const [markerPosition, setMarkerPosition] = useState({ lat: 12.9716, lng: 77.5946 });
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
-  const [foundDonors, setFoundDonors] = useState([]); // <--- STORE DONORS HERE
+  const [foundDonors, setFoundDonors] = useState([]); 
 
   const [inventory, setInventory] = useState({
     'A+': 0, 'A-': 0, 'B+': 0, 'B-': 0,
     'AB+': 0, 'AB-': 0, 'O+': 0, 'O-': 0
   });
+
+  // MODAL STATE
+  const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
+  const [tempInventory, setTempInventory] = useState({}); 
 
   const [requestData, setRequestData] = useState({
     bloodGroup: 'A+',
@@ -80,7 +84,10 @@ const HospitalDashboard = () => {
       try {
         const res = await axiosInstance.get('/hospital/me');
         setHospitalInfo(res.data);
-        if (res.data.inventory) setInventory(res.data.inventory);
+        if (res.data.inventory) {
+            setInventory(res.data.inventory);
+            setTempInventory(res.data.inventory); // Initialize temp state
+        }
         
         if (res.data.location && res.data.location.coordinates) {
              setMarkerPosition({
@@ -103,28 +110,42 @@ const HospitalDashboard = () => {
   const handleUpdateLocation = async () => {
       setIsUpdatingLocation(true);
       try {
-          await axiosInstance.put('/auth/update-profile', {
+          await axiosInstance.put('/hospital/update-location', {
               latitude: markerPosition.lat,
               longitude: markerPosition.lng
           });
           toast.success("Hospital Location Updated!");
       } catch (error) {
+          console.error(error);
           toast.error("Failed to update location.");
       } finally {
           setIsUpdatingLocation(false);
       }
   };
 
-  // === 3. HANDLE REQUEST & MAP DONORS ===
+  // === 3. UPDATE INVENTORY ===
+  const handleInventoryUpdate = async () => {
+    try {
+        const res = await axiosInstance.put('/hospital/update-inventory', {
+            inventory: tempInventory
+        });
+        setInventory(res.data.inventory); 
+        toast.success("Stock Updated Successfully!");
+        setIsInventoryModalOpen(false); 
+    } catch (error) {
+        toast.error("Failed to update stock");
+    }
+  };
+
+  // === 4. HANDLE REQUEST & MAP DONORS ===
   const handleRequest = async (e) => {
     e.preventDefault();
     setRequestLoading(true);
-    setFoundDonors([]); // Reset previous search
+    setFoundDonors([]); 
 
     try {
         const res = await axiosInstance.post('/hospital/request', requestData);
         
-        // SAVE DONORS TO STATE
         if (res.data.donors) {
             setFoundDonors(res.data.donors);
         }
@@ -172,7 +193,13 @@ const HospitalDashboard = () => {
                 <button className="flex items-center gap-2 bg-white border border-gray-300 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition">
                     <Users size={18} /> Donor Database
                 </button>
-                <button className="flex items-center gap-2 bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800 font-medium transition shadow-sm">
+                <button 
+                    onClick={() => {
+                        setTempInventory(inventory); 
+                        setIsInventoryModalOpen(true); 
+                    }}
+                    className="flex items-center gap-2 bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800 font-medium transition shadow-sm"
+                >
                     <PlusCircle size={18} /> Update Stock
                 </button>
             </div>
@@ -300,8 +327,53 @@ const HospitalDashboard = () => {
                     </button>
                 </form>
             </div>
-
         </div>
+
+        {/* === INVENTORY MODAL === */}
+        {isInventoryModalOpen && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+                <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-100">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-bold text-gray-800">Update Blood Stock</h2>
+                        <button onClick={() => setIsInventoryModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        {Object.keys(tempInventory).map((bloodGroup) => (
+                            <div key={bloodGroup} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                <span className="font-bold text-lg text-gray-700">{bloodGroup}</span>
+                                <input 
+                                    type="number" 
+                                    min="0"
+                                    className="w-20 p-2 border border-gray-300 rounded-md text-center font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                                    value={tempInventory[bloodGroup]}
+                                    onChange={(e) => setTempInventory({
+                                        ...tempInventory,
+                                        [bloodGroup]: parseInt(e.target.value) || 0
+                                    })}
+                                />
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={() => setIsInventoryModalOpen(false)}
+                            className="flex-1 py-3 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={handleInventoryUpdate}
+                            className="flex-1 bg-blue-900 text-white py-3 rounded-xl font-bold hover:bg-blue-800 transition shadow-lg"
+                        >
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
       </div>
     </div>
   );

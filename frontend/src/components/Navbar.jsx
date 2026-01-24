@@ -1,18 +1,24 @@
 import React from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, User, Droplet, Menu, X, Building2 } from 'lucide-react';
-
-
+import { LogOut, User, Droplet, Menu, X, Building2, School } from 'lucide-react'; // Added School icon
 
 const Navbar = () => {
   const { authUser, logout } = useAuthStore();
   const navigate = useNavigate();
-  const [isOpen, setIsOpen] = React.useState(false); // Mobile menu state
+  const [isOpen, setIsOpen] = React.useState(false); 
 
   const handleLogout = () => {
     logout();
-    navigate('/'); // Redirect to landing page
+    navigate('/'); 
+  };
+
+  // Helper to safely get the name
+  const getDisplayName = () => {
+    if (!authUser) return "User";
+    // Fallback chain: fullName -> collegeName -> "User"
+    const name = authUser.fullName || authUser.collegeName || "User";
+    return name.split(' ')[0];
   };
 
   return (
@@ -42,10 +48,10 @@ const Navbar = () => {
             {authUser ? (
               // === SHOW THIS IF LOGGED IN ===
               <div className="flex items-center gap-4">
-                 <div className="flex items-center gap-2 bg-red-50 px-3 py-1.5 rounded-full">
-                    <User size={18} className="text-[#b30000]" />
-                    <span className="text-sm font-semibold text-[#b30000]">
-                      {authUser.fullName.split(' ')[0]} {/* First Name only */}
+                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${authUser.role === 'college' ? 'bg-indigo-50 text-indigo-700' : 'bg-red-50 text-[#b30000]'}`}>
+                    {authUser.role === 'college' ? <School size={18} /> : <User size={18} />}
+                    <span className="text-sm font-semibold">
+                      {getDisplayName()} {/* <--- SAFELY RENDER NAME */}
                     </span>
                  </div>
                  <button 
@@ -78,12 +84,12 @@ const Navbar = () => {
         </div>
       </div>
       
-      {/* Mobile Menu Dropdown (Optional) */}
+      {/* Mobile Menu Dropdown */}
       {isOpen && (
         <div className="md:hidden bg-white border-t p-4 space-y-4">
            {authUser ? (
              <>
-               <p className="font-bold text-[#b30000]">Hello, {authUser.fullName}</p>
+               <p className="font-bold text-[#b30000]">Hello, {getDisplayName()}</p>
                <button onClick={handleLogout} className="block w-full text-left text-gray-600">Logout</button>
              </>
            ) : (

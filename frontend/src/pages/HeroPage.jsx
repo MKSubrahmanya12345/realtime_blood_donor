@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import bloodImg from '../assets/blood.jpg'; // Ensure this matches your path
+import bloodImg from '../assets/blood.jpg'; 
 
 const HeroPage = () => {
   const navigate = useNavigate();
@@ -30,47 +30,62 @@ const HeroPage = () => {
 
       {/* ACTION CARDS */}
       <section className="py-12 px-4">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* CHANGED: grid-cols-3 -> grid-cols-4 to fit the new card */}
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           
-          {/* Card 1 */}
-          <div className="bg-white p-8 rounded-xl shadow-md hover:-translate-y-2 transition-transform duration-300 text-center">
+          {/* Card 1: Find Blood */}
+          <div className="bg-white p-6 rounded-xl shadow-md hover:-translate-y-2 transition-transform duration-300 text-center flex flex-col items-center">
             <h3 className="text-xl font-bold text-[#8b0000] mb-3">Find Blood</h3>
-            <p className="text-gray-600 mb-6 text-sm">
+            <p className="text-gray-600 mb-6 text-sm flex-grow">
               Check availability of blood groups in nearby blood banks.
             </p>
             <button 
-              onClick={() => navigate('/blood-availability')}
-              className="bg-[#b30000] text-white px-6 py-2 rounded-md hover:bg-[#8b0000] transition cursor-pointer"
+              onClick={() => navigate('/blood-centers')} // Adjusted to valid route
+              className="bg-[#b30000] text-white px-6 py-2 rounded-md hover:bg-[#8b0000] transition cursor-pointer w-full"
             >
               Search Blood
             </button>
           </div>
 
-          {/* Card 2 */}
-          <div className="bg-white p-8 rounded-xl shadow-md hover:-translate-y-2 transition-transform duration-300 text-center">
+          {/* Card 2: Donate Blood */}
+          <div className="bg-white p-6 rounded-xl shadow-md hover:-translate-y-2 transition-transform duration-300 text-center flex flex-col items-center">
             <h3 className="text-xl font-bold text-[#8b0000] mb-3">Donate Blood</h3>
-            <p className="text-gray-600 mb-6 text-sm">
+            <p className="text-gray-600 mb-6 text-sm flex-grow">
               Register as a donor and help save precious lives.
             </p>
             <button 
               onClick={() => navigate('/signup')} 
-              className="bg-[#b30000] text-white px-6 py-2 rounded-md hover:bg-[#8b0000] transition cursor-pointer"
+              className="bg-[#b30000] text-white px-6 py-2 rounded-md hover:bg-[#8b0000] transition cursor-pointer w-full"
             >
               Donate Now
             </button>
           </div>
 
-          {/* Card 3 */}
-          <div className="bg-white p-8 rounded-xl shadow-md hover:-translate-y-2 transition-transform duration-300 text-center">
+          {/* Card 3: Blood Centers */}
+          <div className="bg-white p-6 rounded-xl shadow-md hover:-translate-y-2 transition-transform duration-300 text-center flex flex-col items-center">
             <h3 className="text-xl font-bold text-[#8b0000] mb-3">Blood Centers</h3>
-            <p className="text-gray-600 mb-6 text-sm">
-              View a directory of registered blood banks and centers.
+            <p className="text-gray-600 mb-6 text-sm flex-grow">
+              Hospital Login for inventory and donor management.
             </p>
             <button 
-              onClick={() => navigate('/blood-centers')}
-              className="bg-[#b30000] text-white px-6 py-2 rounded-md hover:bg-[#8b0000] transition cursor-pointer"
+              onClick={() => navigate('/hospital/login')}
+              className="bg-[#b30000] text-white px-6 py-2 rounded-md hover:bg-[#8b0000] transition cursor-pointer w-full"
             >
-              View Centers
+              Hospital Login
+            </button>
+          </div>
+
+          {/* Card 4: College Partner (NEW) */}
+          <div className="bg-white p-6 rounded-xl shadow-md hover:-translate-y-2 transition-transform duration-300 text-center flex flex-col items-center border-2 border-indigo-100">
+            <h3 className="text-xl font-bold text-indigo-900 mb-3">College Partner</h3>
+            <p className="text-gray-600 mb-6 text-sm flex-grow">
+              Organize drives and verify student donors on campus.
+            </p>
+            <button 
+              onClick={() => navigate('/college/login')}
+              className="bg-indigo-700 text-white px-6 py-2 rounded-md hover:bg-indigo-800 transition cursor-pointer w-full"
+            >
+              College Portal
             </button>
           </div>
 

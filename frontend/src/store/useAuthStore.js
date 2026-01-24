@@ -14,7 +14,7 @@ export const useAuthStore = create((set, get) => ({
         try {
             const res = await axiosInstance.get("/auth/check");
             set({ authUser: res.data });
-            
+
             // If the backend sends a fresh token/location, update it
             if (res.data.token) {
                 localStorage.setItem("jwt", res.data.token);
@@ -27,7 +27,7 @@ export const useAuthStore = create((set, get) => ({
         }
     },
 
-    // === 2. SIGNUP (Step 1) ===
+    // === 2. SIGNUP (Step 1 - Donors / Users) ===
     signup: async (data) => {
         set({ isSigningUp: true });
         try {
@@ -47,7 +47,7 @@ export const useAuthStore = create((set, get) => ({
         set({ isVerifying: true });
         try {
             const res = await axiosInstance.post("/auth/verify-otp", { email, otp, type });
-            
+
             if (res.data.isFullyVerified) {
                 // SAVE TOKEN IF PROVIDED
                 if (res.data.token) {
@@ -58,7 +58,7 @@ export const useAuthStore = create((set, get) => ({
                 toast.success("Verification Complete! Welcome.");
                 return "SUCCESS";
             } else {
-                toast.success(`${type === 'email' ? 'Email' : 'Phone'} verified!`);
+                toast.success(`${type === "email" ? "Email" : "Phone"} verified!`);
                 return "PARTIAL";
             }
         } catch (error) {
@@ -74,7 +74,7 @@ export const useAuthStore = create((set, get) => ({
         set({ isLoggingIn: true });
         try {
             const res = await axiosInstance.post("/auth/login", data);
-            
+
             // CRITICAL FIX: Save Token to LocalStorage
             if (res.data.token) {
                 localStorage.setItem("jwt", res.data.token);
@@ -82,7 +82,7 @@ export const useAuthStore = create((set, get) => ({
 
             set({ authUser: res.data });
             toast.success("Welcome back!");
-            
+
             // Connect Socket (if you have it implemented)
             // get().connectSocket(); 
 
@@ -98,13 +98,13 @@ export const useAuthStore = create((set, get) => ({
     logout: async () => {
         try {
             await axiosInstance.post("/auth/logout");
-            
+
             // CRITICAL FIX: Remove Token
             localStorage.removeItem("jwt");
-            
+
             set({ authUser: null });
             toast.success("Logged out successfully");
-            
+
             // Disconnect Socket
             // get().disconnectSocket();
 
@@ -130,22 +130,25 @@ export const useAuthStore = create((set, get) => ({
 
             // Sync with Server Response
             set({ authUser: res.data.user });
-            
+
             toast.success(newStatus ? "You are now Active!" : "You are now Unavailable");
 
         } catch (error) {
             console.error("Toggle error:", error);
             toast.error("Failed to update status");
+
             // Revert on error
             const { authUser } = get();
-            if(authUser) set({ authUser: { ...authUser, isAvailable: !authUser.isAvailable } });
+            if (authUser) {
+                set({ authUser: { ...authUser, isAvailable: !authUser.isAvailable } });
+            }
         }
     },
 
     // === 7. UPDATE LOCATION (Helper) ===
     updateLocation: async (lat, lng) => {
         try {
-             const res = await axiosInstance.put("/auth/update-profile", {
+            const res = await axiosInstance.put("/auth/update-profile", {
                 latitude: lat,
                 longitude: lng
             });
@@ -153,6 +156,29 @@ export const useAuthStore = create((set, get) => ({
             toast.success("Location Updated!");
         } catch (error) {
             toast.error("Failed to update location");
+        }
+    },
+
+    // === 8. REGISTER COLLEGE (NEW + TOKEN FIX) ===
+    registerCollege: async (data) => {
+        set({ isSigningUp: true });
+        try {
+            const res = await axiosInstance.post("/college/register", data);
+
+            // Save Token & User immediately
+            if (res.data.token) {
+                localStorage.setItem("jwt", res.data.token);
+            }
+
+            set({ authUser: res.data });
+
+            toast.success("College Partner Registered!");
+            return res.data;
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Registration failed");
+            return null;
+        } finally {
+            set({ isSigningUp: false });
         }
     }
 }));

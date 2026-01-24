@@ -1,17 +1,17 @@
 import axios from "axios";
 
 export const axiosInstance = axios.create({
-  // If we are in production, use the live URL. If dev, use localhost.
   baseURL: import.meta.env.MODE === "development" 
     ? "http://localhost:3000/api" 
-    : "/api", // We will use a proxy on Vercel (cleaner) OR put your full Render URL here
+    : "https://bloodlink-4edh.onrender.com/api",
   withCredentials: true,
 });
 
+// === ADD THIS INTERCEPTOR ===
 axiosInstance.interceptors.request.use((config) => {
-    const token = localStorage.getItem("jwt"); // Retrieve token
+    const token = localStorage.getItem("jwt");
     if (token) {
-        config.headers.Authorization = `Bearer ${token}`; // Attach to header
+        config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
 });

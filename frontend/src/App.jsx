@@ -10,12 +10,16 @@ import HomePage from './pages/HomePage';
 import SignUpPage from './pages/SignUpPage';
 import LoginPage from './pages/LoginPage';
 import BloodCentersPage from './pages/BloodCentersPage';
-import HospitalLoginPage from './pages/HospitalLoginPage'; 
+import HospitalLoginPage from './pages/HospitalLoginPage';
 import AboutPage from './pages/AboutPage';
 
-// === NEW IMPORTS ===
-import HospitalOnboardingPage from './pages/HospitalOnboardingPage'; // The new One-Shot form
-import HospitalDashboard from './pages/HospitalDashboard'; // The Dashboard they go to after
+import CollegeRegistrationPage from './pages/CollegeRegistrationPage';
+import CollegeLoginPage from './pages/CollegeLoginPage';
+import CollegeDashboard from './pages/CollegeDashboard';
+
+// === HOSPITAL IMPORTS ===
+import HospitalOnboardingPage from './pages/HospitalOnboardingPage';
+import HospitalDashboard from './pages/HospitalDashboard';
 
 const App = () => {
   const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
@@ -37,31 +41,111 @@ const App = () => {
       <Navbar />
 
       <Routes>
+
+        {/* --- 🚦 ROLE-AWARE HOME ROUTE --- */}
+        <Route
+          path="/"
+          element={
+            !authUser ? (
+              <HeroPage />
+            ) : authUser.role === "hospital" ? (
+              <Navigate to="/hospital" />
+            ) : authUser.role === "college" ? (
+              <Navigate to="/college" />
+            ) : (
+              <HomePage /> // Default: Donor Dashboard
+            )
+          }
+        />
+
         {/* --- PUBLIC ROUTES --- */}
-        <Route path="/" element={authUser ? <HomePage /> : <HeroPage />} />
         <Route path="/blood-centers" element={<BloodCentersPage />} />
-        
-        {/* Donor Signup & Login */}
-        <Route path="/signup" element={!authUser ? <SignUpPage /> : <Navigate to="/" />} />
-        <Route path="/login" element={!authUser ? <LoginPage /> : <Navigate to="/" />} />
+        <Route path="/about" element={<AboutPage />} />
+
+        {/* --- DONOR AUTH --- */}
+        <Route
+          path="/signup"
+          element={!authUser ? <SignUpPage /> : <Navigate to="/" />}
+        />
+        <Route
+          path="/login"
+          element={!authUser ? <LoginPage /> : <Navigate to="/" />}
+        />
 
         {/* --- HOSPITAL ROUTES --- */}
-        
-        {/* 1. REGISTRATION: Only for Guests (Creates Admin + Hospital) */}
-        <Route path="/hospital/register" element={
-            !authUser ? <HospitalOnboardingPage /> : <Navigate to="/hospital" />
-        } />
 
-        {/* 2. DASHBOARD: Only for Logged-in Hospitals */}
-        <Route path="/hospital/login" element={
-            !authUser ? <HospitalLoginPage /> : (authUser.role === 'hospital' ? <Navigate to="/hospital" /> : <Navigate to="/" />)
-        } />
+        {/* 1. REGISTRATION: Only for Guests */}
+        <Route
+          path="/hospital/register"
+          element={
+            !authUser ? (
+              <HospitalOnboardingPage />
+            ) : (
+              <Navigate to="/hospital" />
+            )
+          }
+        />
 
-        <Route path="/hospital" element={
-            authUser?.role === 'hospital' ? <HospitalDashboard /> : <Navigate to="/hospital/login" />
-        } />
+        {/* 2. LOGIN: Only for Guests */}
+        <Route
+          path="/hospital/login"
+          element={
+            !authUser ? (
+              <HospitalLoginPage />
+            ) : authUser.role === "hospital" ? (
+              <Navigate to="/hospital" />
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
 
-        <Route path="/about" element={<AboutPage />} />
+        {/* 3. DASHBOARD: Only for Logged-in Hospitals */}
+        <Route
+          path="/hospital"
+          element={
+            authUser?.role === "hospital" ? (
+              <HospitalDashboard />
+            ) : (
+              <Navigate to="/hospital/login" />
+            )
+          }
+        />
+
+        {/* --- COLLEGE PARTNER ROUTES --- */}
+
+        <Route
+          path="/college/register"
+          element={
+            !authUser ? (
+              <CollegeRegistrationPage />
+            ) : (
+              <Navigate to="/college" />
+            )
+          }
+        />
+
+        <Route
+          path="/college/login"
+          element={
+            !authUser ? (
+              <CollegeLoginPage />
+            ) : (
+              <Navigate to="/college" />
+            )
+          }
+        />
+
+        <Route
+          path="/college"
+          element={
+            authUser?.role === "college" ? (
+              <CollegeDashboard />
+            ) : (
+              <Navigate to="/college/login" />
+            )
+          }
+        />
 
       </Routes>
     </div>
