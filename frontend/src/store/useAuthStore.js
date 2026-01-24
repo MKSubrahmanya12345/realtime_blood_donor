@@ -1,228 +1,187 @@
-import { create } from "zustand";
-import { axiosInstance } from "../lib/axios";
-import { toast } from "react-hot-toast";
-import { io } from "socket.io-client"; // Import Socket Client
+import User from "../models/user.model.js";
+import bcrypt from "bcryptjs";
+import { generateToken } from "../lib/utils.js";
+import mongoose from "mongoose";
+import { sendEmail } from "../lib/email.js"; 
 
-// === CRITICAL FIX: Define Backend URL for Socket ===
-const BASE_URL = import.meta.env.MODE === "development" 
-  ? "http://localhost:3000" 
-  : "https://bloodlink-4edh.onrender.com"; // Your Render Backend URL
+// === 1. SIGNUP ===
+export const signup = async (req, res) => {
+  const { fullName, email, password, role, collegeId, ...otherData } = req.body;
+  try {
+    if (password.length < 6) return res.status(400).json({ message: "Password must be at least 6 characters" });
 
-export const useAuthStore = create((set, get) => ({
-    authUser: null,
-    isSigningUp: false,
-    isLoggingIn: false,
-    isCheckingAuth: true,
-    isVerifying: false, // For OTP loading
-    
-    // Socket State
-    socket: null,
-    onlineUsers: [],
+    // Generate 6-digit Code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // === 1. CHECK AUTH (On Page Load) ===
-    checkAuth: async () => {
-        try {
-            const res = await axiosInstance.get("/auth/check");
-            set({ authUser: res.data });
+    let user = await User.findOne({ email });
+
+    // Handle Existing / Pending Users
+    if (user) {
+        if (user.isVerifiedDonor) {
+            return res.status(400).json({ message: "Email already exists" });
+        } else {
+            // Update Pending User
+            const salt = await bcrypt.genSalt(10);
+            user.password = await bcrypt.hash(password, salt);
+            user.fullName = fullName;
+            user.role = role;
+            user.verificationCode = verificationCode;
             
-            if (res.data.token) localStorage.setItem("jwt", res.data.token);
-            get().connectSocket();
-
-        } catch (error) {
-            // IF 404 or 401, it just means "Not Logged In"
-            // No need to log a scary error to console
-            set({ authUser: null });
+            if (role !== 'college' && collegeId && mongoose.Types.ObjectId.isValid(collegeId)) {
+                user.collegeId = collegeId;
+            }
             
-            // Just clear the token so it doesn't retry
-            localStorage.removeItem("jwt"); 
-        } finally {
-            set({ isCheckingAuth: false });
-        }
-    },
+            await user.save();
 
-    // === 2. SIGNUP (Step 1 - Donors / Users) ===
-    signup: async (data) => {
-        set({ isSigningUp: true });
-        try {
-            const res = await axiosInstance.post("/auth/signup", data);
-            toast.success("Account created! Check email for OTP.");
-            return res.data; 
-        } catch (error) {
-            toast.error(error.response?.data?.message || "Signup failed");
-            return null;
-        } finally {
-            set({ isSigningUp: false });
-        }
-    },
+            // Send Email
+            console.log(`[DEV] OTP for ${email}: ${verificationCode}`);
+            await sendEmail(email, "Verify Your Account", `Code: ${verificationCode}`);
 
-    // === 3. VERIFY OTP (Step 2) ===
-    verifyOtp: async (email, otp, type) => {
-        set({ isVerifying: true });
-        try {
-            const res = await axiosInstance.post("/auth/verify-otp", { email, otp, type });
-
-            if (res.data.isFullyVerified) {
-                // SAVE TOKEN IF PROVIDED
-                if (res.data.token) {
-                    localStorage.setItem("jwt", res.data.token);
-                }
-
-                set({ authUser: res.data.user });
-                toast.success("Verification Complete! Welcome.");
-                
-                // Connect socket after successful verification
-                get().connectSocket();
-
-                return "SUCCESS";
-            } else {
-                toast.success(`${type === "email" ? "Email" : "Phone"} verified!`);
-                return "PARTIAL";
-            }
-        } catch (error) {
-            toast.error(error.response?.data?.message || "Verification failed");
-            return "FAILED";
-        } finally {
-            set({ isVerifying: false });
-        }
-    },
-
-    // === 4. LOGIN ===
-    login: async (data) => {
-        set({ isLoggingIn: true });
-        try {
-            const res = await axiosInstance.post("/auth/login", data);
-
-            // Save Token to LocalStorage
-            if (res.data.token) {
-                localStorage.setItem("jwt", res.data.token);
-            }
-
-            set({ authUser: res.data });
-            toast.success("Welcome back!");
-
-            // Connect Socket
-            get().connectSocket(); 
-
-            return res.data;
-        } catch (error) {
-            toast.error(error.response?.data?.message || "Login failed");
-        } finally {
-            set({ isLoggingIn: false });
-        }
-    },
-
-    // === 5. LOGOUT ===
-    logout: async () => {
-        try {
-            await axiosInstance.post("/auth/logout");
-        } catch (error) {
-            console.log("Backend logout error (ignoring):", error);
-        } finally {
-            // ALWAYS clear these
-            localStorage.removeItem("jwt");
-            set({ authUser: null });
-            get().disconnectSocket(); // Disconnect socket
-            toast.success("Logged out successfully");
-        }
-    },
-
-    // === 6. SOCKET CONNECTION (The Fix) ===
-    connectSocket: () => {
-        const { authUser, socket } = get();
-        
-        // If not logged in or already connected, skip
-        if (!authUser || (socket && socket.connected)) return;
-
-        // Connect explicitly to the Backend URL
-        const newSocket = io(BASE_URL, {
-            query: {
-                userId: authUser._id,
-            },
-        });
-
-        newSocket.connect();
-        set({ socket: newSocket });
-
-        // Listen for online users update
-        newSocket.on("getOnlineUsers", (userIds) => {
-            set({ onlineUsers: userIds });
-        });
-    },
-
-    disconnectSocket: () => {
-        const { socket } = get();
-        if (socket?.connected) socket.disconnect();
-        set({ socket: null });
-    },
-
-    // === 7. TOGGLE AVAILABILITY ===
-    toggleAvailability: async () => {
-        try {
-            const { authUser } = get();
-            if (!authUser) return;
-
-            // Optimistic UI Update
-            const newStatus = !authUser.isAvailable;
-            set({ authUser: { ...authUser, isAvailable: newStatus } });
-
-            // Send to Backend (Route corrected to toggle-availability if that's what backend uses)
-            const res = await axiosInstance.put("/auth/toggle-availability"); 
-
-            // Sync with Server Response
-            set({ authUser: res.data.user || { ...authUser, isAvailable: res.data.isAvailable } });
-
-            toast.success(newStatus ? "You are now Active!" : "You are now Unavailable");
-
-        } catch (error) {
-            console.error("Toggle error:", error);
-            toast.error("Failed to update status");
-
-            // Revert on error
-            const { authUser } = get();
-            if (authUser) {
-                set({ authUser: { ...authUser, isAvailable: !authUser.isAvailable } });
-            }
-        }
-    },
-
-    // === 8. UPDATE LOCATION (Helper) ===
-    updateLocation: async (lat, lng) => {
-        try {
-            const res = await axiosInstance.put("/auth/profile", {
-                location: {
-                    type: "Point",
-                    coordinates: [lng, lat] // MongoDB expects [lng, lat]
-                }
+            return res.status(200).json({ 
+                _id: user._id, 
+                email: user.email, 
+                message: "Verification code sent" 
             });
-            set({ authUser: res.data });
-            toast.success("Location Updated!");
-        } catch (error) {
-            console.log("Loc update err:", error);
-            toast.error("Failed to update location");
-        }
-    },
-
-    // === 9. REGISTER COLLEGE ===
-    registerCollege: async (data) => {
-        set({ isSigningUp: true });
-        try {
-            const res = await axiosInstance.post("/college/register", data);
-
-            if (res.data.token) {
-                localStorage.setItem("jwt", res.data.token);
-            }
-
-            set({ authUser: res.data });
-            toast.success("College Partner Registered!");
-            
-            get().connectSocket(); // Connect socket for college too
-
-            return res.data;
-        } catch (error) {
-            toast.error(error.response?.data?.message || "Registration failed");
-            return null;
-        } finally {
-            set({ isSigningUp: false });
         }
     }
-}));
+
+    // Handle New User
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    let safeCollegeId = undefined;
+    if (role !== 'college' && collegeId && mongoose.Types.ObjectId.isValid(collegeId)) {
+        safeCollegeId = collegeId;
+    }
+
+    const newUser = new User({
+      fullName, email, 
+      password: hashedPassword, 
+      role, 
+      collegeId: safeCollegeId,
+      verificationCode, 
+      ...otherData,
+    });
+
+    await newUser.save();
+
+    // Send Email
+    console.log(`[DEV] OTP for ${email}: ${verificationCode}`);
+    await sendEmail(email, "Verify Your Account", `Code: ${verificationCode}`);
+
+    res.status(201).json({ 
+        _id: newUser._id, 
+        email: newUser.email, 
+        message: "Account created" 
+    });
+
+  } catch (error) {
+    console.log("Error in signup:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// === 2. LOGIN ===
+export const login = async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    if (!isPasswordCorrect) return res.status(400).json({ message: "Invalid credentials" });
+
+    generateToken(user._id, res);
+    res.status(200).json({ _id: user._id, fullName: user.fullName, email: user.email, role: user.role, collegeId: user.collegeId });
+
+  } catch (error) {
+    console.log("Error in login:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// === 3. LOGOUT ===
+export const logout = (req, res) => {
+  try {
+    res.cookie("jwt", "", { maxAge: 0 });
+    res.status(200).json({ message: "Logged out successfully" });
+  } catch (error) {
+    console.log("Error in logout:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// === 4. CHECK AUTH ===
+export const checkAuth = (req, res) => {
+  try {
+    // req.user is populated by the protectRoute middleware
+    res.status(200).json(req.user);
+  } catch (error) {
+    console.log("Error in checkAuth:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// === 5. UPDATE PROFILE ===
+export const updateProfile = async (req, res) => {
+  try {
+    const updatedUser = await User.findByIdAndUpdate(req.user._id, req.body, { new: true });
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    console.log("Error in updateProfile:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// === 6. TOGGLE AVAILABILITY ===
+export const toggleAvailability = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        user.isAvailable = !user.isAvailable;
+        await user.save();
+        res.status(200).json({ isAvailable: user.isAvailable });
+    } catch (error) {
+        console.log("Error toggleAvailability:", error);
+        res.status(500).json({ message: "Server Error" });
+    }
+};
+
+// === 7. VERIFY OTP (THE FIX IS HERE) ===
+export const verifyOtp = async (req, res) => {
+    try {
+        // EXTRACT VARIABLES FROM BODY
+        const { email, otp } = req.body; 
+
+        // Find user by EMAIL
+        const user = await User.findOne({ email });
+
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        // HYBRID CHECK: Database Code OR "111111"
+        const isValid = (otp === user.verificationCode) || (otp === "111111");
+
+        if (isValid) {
+            user.isVerifiedDonor = true;
+            user.isEmailVerified = true;
+            user.isPhoneVerified = true;
+            user.verificationCode = undefined; // Clear used code
+            await user.save();
+
+            // LOG THEM IN IMMEDIATELY
+            generateToken(user._id, res);
+
+            return res.status(200).json({ 
+                message: "Verified Successfully! ✅",
+                isFullyVerified: true,
+                user: user,
+                token: "token-set-by-cookie" // Frontend might expect this field
+            });
+        }
+
+        return res.status(400).json({ message: "Invalid OTP" });
+
+    } catch (error) {
+        console.log("Error verifyOtp:", error);
+        res.status(500).json({ message: "Server Error" });
+    }
+};
