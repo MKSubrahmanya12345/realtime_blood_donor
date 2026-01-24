@@ -19,67 +19,63 @@ export const registerCollege = async (req, res) => {
     } = req.body;
 
     if (!latitude || !longitude) {
-      return res.status(400).json({ message: "College location is required" });
+      return res.status(400).json({ message: "Location is required" });
     }
 
-    // Check existing
     const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "Email already registered" });
-    }
+    if (existingUser) return res.status(400).json({ message: "Email already registered" });
 
-    // Create Admin User
+    // 1. Create User (Role: college)
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const newUser = new User({
-      fullName: collegeName,       // Use college name as user name
+      fullName: collegeName,
       email,
       password: hashedPassword,
-      role: "college",             // <--- ROLE FIX
-      isEmailVerified: true,       // Auto-verify orgs
-      isPhoneVerified: true
+      role: "college",       
+      isEmailVerified: true, 
+      isPhoneVerified: true,
+      // === FIX: SAVE LOCATION TO USER TOO ===
+      address: address,
+      location: {
+        type: "Point",
+        coordinates: [parseFloat(longitude), parseFloat(latitude)] 
+      }
     });
+    
+    savedUser = await newUser.save(); 
 
-    savedUser = await newUser.save();
-
-    // Create College Profile
+    // 2. Create College Profile
     const newCollege = new College({
       collegeName,
       email,
       address,
       location: {
         type: "Point",
-        coordinates: [
-          parseFloat(longitude),
-          parseFloat(latitude)
-        ]
+        coordinates: [parseFloat(longitude), parseFloat(latitude)] 
       },
       adminUserId: savedUser._id
     });
 
     await newCollege.save();
-
-    // Generate Token
+    
+    // 3. Generate Token
     const token = generateToken(savedUser._id, res);
 
     res.status(201).json({
       _id: savedUser._id,
       email: savedUser.email,
       role: "college",
+      fullName: savedUser.fullName, 
       collegeName: newCollege.collegeName,
-      token, // <-- CRITICAL FIX: frontend auto-login
+      token, 
       message: "College Registered Successfully!"
     });
 
   } catch (error) {
     console.log("Error registerCollege:", error.message);
-
-    // Cleanup partially created user
-    if (savedUser) {
-      await User.findByIdAndDelete(savedUser._id);
-    }
-
+    if (savedUser) await User.findByIdAndDelete(savedUser._id); 
     res.status(500).json({ message: "Server Error" });
   }
 };

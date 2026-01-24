@@ -23,9 +23,6 @@ const userSchema = new mongoose.Schema(
     phone: {
       type: String,
     },
-    location: {
-      type: String,
-    },
     bloodGroup: {
       type: String,
       enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
@@ -33,10 +30,7 @@ const userSchema = new mongoose.Schema(
     lastDonationDate: {
       type: Date,
     },
-    isAvailable: {
-      type: Boolean,
-      default: true,
-    },
+
     collegeId: {
       type: String, // Roll Number
     },
