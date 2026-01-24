@@ -8,8 +8,8 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = React.useState(false); 
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async() => {
+    await logout();
     navigate('/'); 
   };
 

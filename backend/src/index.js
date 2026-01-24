@@ -34,6 +34,7 @@ app.use("/api/college", collegeRoutes);
 
 
 
+
 app.listen(PORT, ()=>{
     console.log(`Listening on port ${PORT}`);
     connectDB();

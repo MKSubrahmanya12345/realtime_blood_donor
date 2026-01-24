@@ -27,9 +27,6 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
     },
-    lastDonationDate: {
-      type: Date,
-    },
 
     collegeId: {
       type: String, // Roll Number

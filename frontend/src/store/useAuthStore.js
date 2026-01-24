@@ -98,18 +98,13 @@ export const useAuthStore = create((set, get) => ({
     logout: async () => {
         try {
             await axiosInstance.post("/auth/logout");
-
-            // CRITICAL FIX: Remove Token
+        } catch (error) {
+            console.log("Backend logout error (ignoring):", error);
+        } finally {
+            // ALWAYS clear these, even if the server request fails
             localStorage.removeItem("jwt");
-
             set({ authUser: null });
             toast.success("Logged out successfully");
-
-            // Disconnect Socket
-            // get().disconnectSocket();
-
-        } catch (error) {
-            toast.error(error.response?.data?.message || "Logout failed");
         }
     },
 
