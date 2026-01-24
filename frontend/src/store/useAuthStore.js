@@ -25,16 +25,16 @@ export const useAuthStore = create((set, get) => ({
             const res = await axiosInstance.get("/auth/check");
             set({ authUser: res.data });
             
-            // Connect socket if user is authenticated
+            if (res.data.token) localStorage.setItem("jwt", res.data.token);
             get().connectSocket();
 
-            // If the backend sends a fresh token, update it
-            if (res.data.token) {
-                localStorage.setItem("jwt", res.data.token);
-            }
         } catch (error) {
+            // IF 404 or 401, it just means "Not Logged In"
+            // No need to log a scary error to console
             set({ authUser: null });
-            console.log("Error in checkAuth:", error);
+            
+            // Just clear the token so it doesn't retry
+            localStorage.removeItem("jwt"); 
         } finally {
             set({ isCheckingAuth: false });
         }
