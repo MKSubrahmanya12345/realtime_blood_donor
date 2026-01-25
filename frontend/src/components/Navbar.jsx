@@ -31,7 +31,7 @@ const Navbar = () => {
             <div className="flex items-center gap-6">
                 <Link to="/" className={isActive('/')}>Home</Link>
                 <Link to="/about" className={isActive('/about')}>About Us</Link>
-                <Link to="/centers" className={isActive('/centers')}>Blood Centers</Link>
+                <Link to="/blood-centers" className={isActive('/blood-centers')}>Blood Centers</Link>
             </div>
 
             {!authUser ? (
@@ -78,7 +78,7 @@ const Navbar = () => {
         <div className="md:hidden bg-white border-t border-gray-100 p-4 space-y-4 shadow-xl absolute w-full left-0 z-50">
           <Link to="/" onClick={closeMenu} className="block text-gray-700 font-medium">Home</Link>
           <Link to="/about" onClick={closeMenu} className="block text-gray-700 font-medium">About Us</Link>
-          <Link to="/centers" onClick={closeMenu} className="block text-gray-700 font-medium">Blood Centers</Link>
+          <Link to="/blood-centers" onClick={closeMenu} className="block text-gray-700 font-medium">Blood Centers</Link>
           
           <div className="border-t border-gray-100 pt-4 space-y-3">
             {!authUser ? (

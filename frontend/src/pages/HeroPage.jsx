@@ -68,7 +68,7 @@ const HeroPage = () => {
               Hospital Login for inventory and donor management.
             </p>
             <button 
-              onClick={() => navigate('/hospital/login')}
+              onClick={() => navigate('/blood-centers')}
               className="bg-[#b30000] text-white px-6 py-2 rounded-md hover:bg-[#8b0000] transition cursor-pointer w-full"
             >
               Hospital Login
