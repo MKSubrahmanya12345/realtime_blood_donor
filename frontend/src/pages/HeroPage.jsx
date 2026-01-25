@@ -198,7 +198,7 @@ const HeroPage = () => {
       {/* FOOTER */}
       <footer className="bg-slate-950 text-slate-500 py-12 text-center text-sm border-t border-slate-900">
         <p>© 2026 BloodLink Network. Built for the DUHacks 2026.</p>
-        <p>Built by M K Subrahmanya, Snehith P and Vaishnavi Ghogare with ❤️.</p>
+        <p>Built by M K Subrahmanya, Snehith P, Vaishnavi Ghogare with ❤️.</p>
       </footer>
     </div>
   );
