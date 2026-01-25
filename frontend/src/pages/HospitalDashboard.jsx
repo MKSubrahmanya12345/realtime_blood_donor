@@ -141,28 +141,37 @@ const HospitalDashboard = () => {
   const handleRequest = async (e) => {
     e.preventDefault();
     setRequestLoading(true);
-    setFoundDonors([]); 
+    setFoundDonors([]);
 
     try {
+        // Ensure backend location is fresh
+        await axiosInstance.put('/hospital/update-location', {
+        latitude: markerPosition.lat,
+        longitude: markerPosition.lng
+        });
+
         const res = await axiosInstance.post('/hospital/request', requestData);
-        
+
         if (res.data.donors) {
-            setFoundDonors(res.data.donors);
+        setFoundDonors(res.data.donors);
         }
 
         toast.success(
-            <div className="flex flex-col">
-                <span className="font-bold">Broadcast Sent! 📡</span>
-                <span className="text-sm">Notified {res.data.donorsFound} donors nearby.</span>
-            </div>,
-            { duration: 5000 }
+        <div className="flex flex-col">
+            <span className="font-bold">Broadcast Sent! 📡</span>
+            <span className="text-sm">
+            Notified {res.data.donorsFound || 0} donors nearby.
+            </span>
+        </div>,
+        { duration: 5000 }
         );
     } catch (error) {
         toast.error(error.response?.data?.message || "Failed to send alert.");
     } finally {
         setRequestLoading(false);
     }
-  };
+    };
+
 
   if (loading) {
     return (
