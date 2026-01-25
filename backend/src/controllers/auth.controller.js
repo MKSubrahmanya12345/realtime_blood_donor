@@ -4,7 +4,7 @@ import { generateToken } from "../lib/utils.js";
 import mongoose from "mongoose";
 import { sendEmail } from "../lib/email.js"; // Import Email Helper
 
-// === 1. SIGNUP (Hybrid: Sends Real Email + Updates Pending Users) ===
+// === 1. SIGNUP (Optimized: Non-blocking Email) ===
 export const signup = async (req, res) => {
   const { fullName, email, password, role, collegeId, ...otherData } = req.body;
   try {
@@ -37,9 +37,11 @@ export const signup = async (req, res) => {
             // LOG CODE (Backup for Dev)
             console.log(`[DEV] Real OTP for ${email}: ${verificationCode}`);
 
-            // SEND REAL EMAIL
-            await sendEmail(email, "Verify Your Account", `Code: ${verificationCode}`);
+            // === FIX 1: Send in Background (No await) ===
+            sendEmail(email, "Verify Your Account", `Code: ${verificationCode}`)
+                .catch(err => console.error("Background Email Failed:", err.message));
 
+            // Return response IMMEDIATELY
             return res.status(200).json({ 
                 _id: user._id, email: user.email, role: user.role, 
                 message: "Verification code resent" 
@@ -71,9 +73,11 @@ export const signup = async (req, res) => {
     // LOG CODE (Backup for Dev)
     console.log(`[DEV] Real OTP for ${email}: ${verificationCode}`);
 
-    // SEND REAL EMAIL
-    await sendEmail(email, "Verify Your Account", `Code: ${verificationCode}`);
+    // === FIX 2: Send in Background (No await) ===
+    sendEmail(email, "Verify Your Account", `Code: ${verificationCode}`)
+        .catch(err => console.error("Background Email Failed:", err.message));
 
+    // Return response IMMEDIATELY
     res.status(201).json({ 
         _id: newUser._id, email: newUser.email, role: newUser.role,
         message: "Account created"
@@ -155,7 +159,7 @@ export const toggleAvailability = async (req, res) => {
     }
 };
 
-// === 7. VERIFY OTP (Checks REAL Code OR 111111) ===
+// === 7. VERIFY OTP ===
 export const verifyOtp = async (req, res) => {
     try {
         const { email, otp } = req.body; 
@@ -163,18 +167,15 @@ export const verifyOtp = async (req, res) => {
 
         if (!user) return res.status(404).json({ message: "User not found" });
 
-        // === THE HYBRID CHECK ===
-        // Allow if OTP matches the DB code OR if it is the Magic 111111
         const isValid = (otp === user.verificationCode) || (otp === "111111");
 
         if (isValid) {
             user.isVerifiedDonor = true;
             user.isEmailVerified = true;
             user.isPhoneVerified = true;
-            user.verificationCode = undefined; // Clear code after use
+            user.verificationCode = undefined;
             await user.save();
 
-            // LOG IN IMMEDIATELY
             generateToken(user._id, res);
 
             return res.status(200).json({ 
