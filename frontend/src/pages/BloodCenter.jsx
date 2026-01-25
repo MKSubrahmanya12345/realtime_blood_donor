@@ -117,4 +117,4 @@ const Bloodcenter = () => {
   );
 };
 
-export default Bloodcenter;
+export default BloodCenter;
