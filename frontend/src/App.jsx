@@ -25,6 +25,10 @@ import CollegeRegistrationPage from "./pages/CollegeRegistrationPage";
 import CollegeLoginPage from "./pages/CollegeLoginPage";
 import CollegeDashboard from "./pages/CollegeDashboard";
 
+
+import BloodCenter from "./pages/BloodCenter";
+
+
 const App = () => {
   const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
   const { connectSocket, disconnectSocket, socket } = useSocketStore();
@@ -203,6 +207,8 @@ const App = () => {
             )
           }
         />
+
+        <Route path="/blood-center" element={<BloodCenter />} />
       </Routes>
     </div>
   );
