@@ -448,7 +448,7 @@ const SignUpPage = () => {
       <div className="max-w-4xl w-full bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row">
         <div className="hidden md:flex flex-col justify-center items-center w-1/2 bg-[#ffeaea] p-8 text-center">
           <h2 className="text-3xl font-bold text-[#8b0000] mb-4">
-            {step === 1 ? "Join the Network" : "Almost There!"}
+            {step === 1 ? "Join the Network" : "Almost There!!"}
           </h2>
           <p className="text-gray-700 mb-6">
             {step === 1
