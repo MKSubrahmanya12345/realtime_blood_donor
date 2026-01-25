@@ -94,11 +94,21 @@ const App = () => {
     };
   }, [socket]);
 
-  // Loading Screen
+  // === UPDATED LOADING SCREEN ===
   if (isCheckingAuth && !authUser)
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader className="size-10 animate-spin text-[#b30000]" />
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-50 px-4">
+        <Loader className="size-16 animate-spin text-[#b30000] mb-6" />
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">
+          Connecting to BloodLink...
+        </h1>
+        <p className="text-gray-500 text-center max-w-md animate-pulse">
+          PLEASE WAIT... <br />
+          First time initialization may take a few seconds as the server wakes up.
+        </p>
+        <p className="text-xs text-gray-400 mt-8">
+          (Hosting Provider Cold Start)
+        </p>
       </div>
     );
 
@@ -121,7 +131,7 @@ const App = () => {
             ) : authUser.role === "college" ? (
               <Navigate to="/college" />
             ) : (
-              <HomePage /> // Donors go here
+              <HomePage />
             )
           }
         />

@@ -3,6 +3,20 @@ import User from "../models/user.model.js";
 import { sendEmergencyEmail } from "../lib/email.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 
+
+// backend/src/controllers/request.controller.js
+
+const bloodCompatibility = {
+    "O-": ["O-"], // O- patients can only receive from O-
+    "O+": ["O+", "O-"], 
+    "A-": ["A-", "O-"],
+    "A+": ["A+", "A-", "O+", "O-"],
+    "B-": ["B-", "O-"],
+    "B+": ["B+", "B-", "O+", "O-"],
+    "AB-": ["AB-", "A-", "B-", "O-"],
+    "AB+": ["AB+", "AB-", "A+", "A-", "B+", "B-", "O+", "O-"] 
+};
+
 // DEBUG VERSION: Create Request & Notify
 export const createRequest = async (req, res) => {
   console.log("---------------------------------------");
@@ -42,13 +56,15 @@ export const createRequest = async (req, res) => {
     await newRequest.save();
     console.log("2. Request Saved to Database ✅");
 
+    const compatibleGroups = bloodCompatibility[bloodGroup] || [bloodGroup];
+
     // 2. Search Donors
     if (latitude && longitude) {
       console.log(`3. Searching for [${bloodGroup}] donors near [${longitude}, ${latitude}]...`);
         
       const nearbyDonors = await User.find({
         role: 'donor',
-        bloodGroup: bloodGroup,
+        bloodGroup: { $in: compatibleGroups },
         isAvailable: true,
         location: {
           $near: {
