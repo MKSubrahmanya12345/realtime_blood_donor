@@ -26,8 +26,6 @@ import CollegeLoginPage from "./pages/CollegeLoginPage";
 import CollegeDashboard from "./pages/CollegeDashboard";
 
 
-import BloodCenter from "./pages/BloodCenter";
-
 
 const App = () => {
   const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
