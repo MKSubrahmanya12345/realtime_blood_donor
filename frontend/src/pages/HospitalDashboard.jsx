@@ -4,46 +4,39 @@ import { PlusCircle, Activity, Users, AlertTriangle, Loader, Droplet, MapPin, Sa
 import { toast } from 'react-hot-toast';
 import { axiosInstance } from '../lib/axios';
 
-// === MAP IMPORTS ===
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// Fix for default Leaflet marker icons
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
 let DefaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41]
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41]
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
-// === COMPONENT: DRAGGABLE MARKER ===
 function DraggableMarker({ position, setPosition }) {
   const markerRef = useRef(null);
-  
+
   const eventHandlers = useMemo(
     () => ({
       dragend() {
         const marker = markerRef.current;
-        if (marker != null) {
+        if (marker) {
           const { lat, lng } = marker.getLatLng();
           setPosition({ lat, lng });
         }
-      },
+      }
     }),
-    [setPosition],
+    [setPosition]
   );
 
   return (
-    <Marker
-      draggable={true}
-      eventHandlers={eventHandlers}
-      position={position}
-      ref={markerRef}>
+    <Marker draggable eventHandlers={eventHandlers} position={position} ref={markerRef}>
       <Popup minWidth={90}>
         <span>Your Hospital Location</span>
       </Popup>
@@ -55,20 +48,18 @@ const HospitalDashboard = () => {
   const { authUser } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [hospitalInfo, setHospitalInfo] = useState(null);
-  
-  // MAP STATE
+
   const [markerPosition, setMarkerPosition] = useState({ lat: 12.9716, lng: 77.5946 });
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
-  const [foundDonors, setFoundDonors] = useState([]); 
+  const [foundDonors, setFoundDonors] = useState([]);
 
   const [inventory, setInventory] = useState({
     'A+': 0, 'A-': 0, 'B+': 0, 'B-': 0,
     'AB+': 0, 'AB-': 0, 'O+': 0, 'O-': 0
   });
 
-  // MODAL STATE
   const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
-  const [tempInventory, setTempInventory] = useState({}); 
+  const [tempInventory, setTempInventory] = useState({});
 
   const [requestData, setRequestData] = useState({
     bloodGroup: 'A+',
@@ -78,22 +69,22 @@ const HospitalDashboard = () => {
 
   const [requestLoading, setRequestLoading] = useState(false);
 
-  // === 1. FETCH DATA ===
   useEffect(() => {
     const fetchHospitalData = async () => {
       try {
         const res = await axiosInstance.get('/hospital/me');
         setHospitalInfo(res.data);
+
         if (res.data.inventory) {
-            setInventory(res.data.inventory);
-            setTempInventory(res.data.inventory); // Initialize temp state
+          setInventory(res.data.inventory);
+          setTempInventory(res.data.inventory);
         }
-        
+
         if (res.data.location && res.data.location.coordinates) {
-             setMarkerPosition({
-                 lat: res.data.location.coordinates[1],
-                 lng: res.data.location.coordinates[0]
-             });
+          setMarkerPosition({
+            lat: res.data.location.coordinates[1],
+            lng: res.data.location.coordinates[0]
+          });
         }
       } catch (error) {
         console.error("Error fetching hospital data:", error);
@@ -106,281 +97,328 @@ const HospitalDashboard = () => {
     fetchHospitalData();
   }, []);
 
-  // === 2. UPDATE LOCATION ===
   const handleUpdateLocation = async () => {
-      setIsUpdatingLocation(true);
-      try {
-          await axiosInstance.put('/hospital/update-location', {
-              latitude: markerPosition.lat,
-              longitude: markerPosition.lng
-          });
-          toast.success("Hospital Location Updated!");
-      } catch (error) {
-          console.error(error);
-          toast.error("Failed to update location.");
-      } finally {
-          setIsUpdatingLocation(false);
-      }
-  };
-
-  // === 3. UPDATE INVENTORY ===
-  const handleInventoryUpdate = async () => {
+    setIsUpdatingLocation(true);
     try {
-        const res = await axiosInstance.put('/hospital/update-inventory', {
-            inventory: tempInventory
-        });
-        setInventory(res.data.inventory); 
-        toast.success("Stock Updated Successfully!");
-        setIsInventoryModalOpen(false); 
+      await axiosInstance.put('/hospital/update-location', {
+        latitude: markerPosition.lat,
+        longitude: markerPosition.lng
+      });
+      toast.success("Hospital Location Updated!");
     } catch (error) {
-        toast.error("Failed to update stock");
+      console.error(error);
+      toast.error("Failed to update location.");
+    } finally {
+      setIsUpdatingLocation(false);
     }
   };
 
-  // === 4. HANDLE REQUEST & MAP DONORS ===
+  const handleInventoryUpdate = async () => {
+    try {
+      const res = await axiosInstance.put('/hospital/update-inventory', {
+        inventory: tempInventory
+      });
+      setInventory(res.data.inventory);
+      toast.success("Stock Updated Successfully!");
+      setIsInventoryModalOpen(false);
+    } catch (error) {
+      toast.error("Failed to update stock");
+    }
+  };
+
   const handleRequest = async (e) => {
     e.preventDefault();
     setRequestLoading(true);
     setFoundDonors([]);
 
     try {
-        // Ensure backend location is fresh
-        await axiosInstance.put('/hospital/update-location', {
+      await axiosInstance.put('/hospital/update-location', {
         latitude: markerPosition.lat,
         longitude: markerPosition.lng
-        });
+      });
 
-        const res = await axiosInstance.post('/hospital/request', requestData);
+      const res = await axiosInstance.post('/hospital/request', requestData);
 
-        if (res.data.donors) {
+      if (res.data.donors) {
         setFoundDonors(res.data.donors);
-        }
+      }
 
-        toast.success(
+      toast.success(
         <div className="flex flex-col">
-            <span className="font-bold">Broadcast Sent! 📡</span>
-            <span className="text-sm">
+          <span className="font-bold">Broadcast Sent! 📡</span>
+          <span className="text-sm">
             Notified {res.data.donorsFound || 0} donors nearby.
-            </span>
+          </span>
         </div>,
         { duration: 5000 }
-        );
+      );
     } catch (error) {
-        toast.error(error.response?.data?.message || "Failed to send alert.");
+      toast.error(error.response?.data?.message || "Failed to send alert.");
     } finally {
-        setRequestLoading(false);
+      setRequestLoading(false);
     }
-    };
-
+  };
 
   if (loading) {
     return (
-        <div className="flex items-center justify-center h-screen bg-gray-50">
-            <Loader className="animate-spin text-blue-900" size={40} />
-        </div>
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <Loader className="animate-spin text-blue-900" size={40} />
+      </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        
-        {/* HEADER */}
+
         <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-                <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-                    <div className="bg-blue-100 p-2 rounded-lg">
-                        <Activity className="text-blue-900" />
-                    </div>
-                    {hospitalInfo?.hospitalName || "Hospital Dashboard"}
-                </h1>
-                <p className="text-gray-500 mt-1 ml-1">
-                    License: <span className="font-mono text-gray-700 bg-gray-200 px-2 py-0.5 rounded text-sm">{hospitalInfo?.licenseNumber}</span>
-                </p>
-            </div>
-            <div className="flex gap-3">
-                <button className="flex items-center gap-2 bg-white border border-gray-300 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition">
-                    <Users size={18} /> Donor Database
-                </button>
-                <button 
-                    onClick={() => {
-                        setTempInventory(inventory); 
-                        setIsInventoryModalOpen(true); 
-                    }}
-                    className="flex items-center gap-2 bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800 font-medium transition shadow-sm"
-                >
-                    <PlusCircle size={18} /> Update Stock
-                </button>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
+              <div className="bg-blue-100 p-2 rounded-lg">
+                <Activity className="text-blue-900" />
+              </div>
+              {hospitalInfo?.hospitalName || "Hospital Dashboard"}
+            </h1>
+            <p className="text-gray-500 mt-1 ml-1">
+              License:
+              <span className="font-mono text-gray-700 bg-gray-200 px-2 py-0.5 rounded text-sm ml-2">
+                {hospitalInfo?.licenseNumber}
+              </span>
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <button className="flex items-center gap-2 bg-white border border-gray-300 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition">
+              <Users size={18} /> Donor Database
+            </button>
+
+            <button
+              onClick={() => {
+                setTempInventory(inventory);
+                setIsInventoryModalOpen(true);
+              }}
+              className="flex items-center gap-2 bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800 font-medium transition shadow-sm"
+            >
+              <PlusCircle size={18} /> Update Stock
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            {/* LEFT COLUMN: INVENTORY & MAP */}
-            <div className="lg:col-span-2 space-y-8">
-                
-                {/* 1. INVENTORY */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-gray-800">
-                        <Droplet className="text-red-500 fill-current" size={20} /> 
-                        Live Blood Inventory
-                    </h2>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        {Object.entries(inventory).map(([group, count]) => (
-                            <div key={group} className={`relative p-4 rounded-xl border-2 transition-all duration-200 ${
-                                count < 5 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'
-                            }`}>
-                                <h3 className="text-2xl font-black text-gray-800">{group}</h3>
-                                <p className={`text-lg font-bold ${count < 5 ? 'text-red-700' : 'text-emerald-700'}`}>
-                                    {count} <span className="text-sm font-medium opacity-70">Units</span>
-                                </p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
 
-                {/* 2. MAP CARD */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                     <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-bold flex items-center gap-2 text-gray-800">
-                            <MapPin className="text-blue-600" size={20} /> 
-                            Live Map
-                        </h2>
-                        <button 
-                            onClick={handleUpdateLocation}
-                            disabled={isUpdatingLocation}
-                            className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-green-700 transition"
-                        >
-                             {isUpdatingLocation ? <Loader size={16} className="animate-spin"/> : <Save size={16}/>}
-                             Save Location
-                        </button>
-                     </div>
-                     
-                     <div className="h-96 w-full rounded-xl overflow-hidden border-2 border-gray-200 relative z-0">
-                         <MapContainer center={markerPosition} zoom={13} style={{ height: "100%", width: "100%" }}>
-                            <TileLayer
-                                attribution='&copy; OpenStreetMap contributors'
-                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                            />
-                            
-                            {/* HOSPITAL MARKER (DRAGGABLE) */}
-                            <DraggableMarker position={markerPosition} setPosition={setMarkerPosition} />
+          <div className="lg:col-span-2 space-y-8">
 
-                            {/* DONOR MARKERS (RED DOTS) */}
-                            {foundDonors.map((donor) => (
-                                donor.location && donor.location.coordinates ? (
-                                    <CircleMarker 
-                                        key={donor._id}
-                                        center={[donor.location.coordinates[1], donor.location.coordinates[0]]}
-                                        pathOptions={{ color: 'red', fillColor: '#f00', fillOpacity: 0.7 }}
-                                        radius={8}
-                                    >
-                                        <Tooltip>{donor.fullName} ({donor.bloodGroup})</Tooltip>
-                                    </CircleMarker>
-                                ) : null
-                            ))}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-gray-800">
+                <Droplet className="text-red-500 fill-current" size={20} />
+                Live Blood Inventory
+              </h2>
 
-                         </MapContainer>
-                     </div>
-                     <p className="text-xs text-gray-500 mt-2 text-center">
-                        *Drag the Blue Marker to set Hospital location. Red dots are found donors.
-                     </p>
-                </div>
-
-            </div>
-
-            {/* RIGHT COLUMN: REQUEST FORM */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border-t-4 border-red-600 h-fit">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="bg-red-100 p-2 rounded-full animate-pulse">
-                        <AlertTriangle className="text-red-600" size={24} />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold text-gray-900">Emergency Broadcast</h2>
-                    </div>
-                </div>
-
-                <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-                    Locate registered donors within <span className="font-bold text-gray-900">10 KM</span>.
-                </p>
-
-                <form onSubmit={handleRequest} className="space-y-5">
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">Blood Group</label>
-                        <select 
-                            className="w-full p-3 border border-gray-300 rounded-lg outline-none bg-gray-50"
-                            value={requestData.bloodGroup}
-                            onChange={(e) => setRequestData({...requestData, bloodGroup: e.target.value})}
-                        >
-                            {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(g => <option key={g} value={g}>{g}</option>)}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">Units</label>
-                        <input 
-                            type="number" min="1" max="50"
-                            className="w-full p-3 border border-gray-300 rounded-lg outline-none bg-gray-50"
-                            value={requestData.units}
-                            onChange={(e) => setRequestData({...requestData, units: e.target.value})}
-                        />
-                    </div>
-
-                    <button 
-                        type="submit" 
-                        disabled={requestLoading}
-                        className="w-full bg-red-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-red-700 transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-70"
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {Object.entries(inventory).map(([group, count]) => (
+                  <div
+                    key={group}
+                    className={`relative p-4 rounded-xl border-2 transition-all duration-200 ${
+                      count < 5 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'
+                    }`}
+                  >
+                    <h3 className="text-2xl font-black text-gray-800">{group}</h3>
+                    <p
+                      className={`text-lg font-bold ${
+                        count < 5 ? 'text-red-700' : 'text-emerald-700'
+                      }`}
                     >
-                        {requestLoading ? <Loader className="animate-spin" /> : <AlertTriangle className="fill-current" />}
-                        {requestLoading ? "Broadcasting..." : "Find Donors Nearby"}
-                    </button>
-                </form>
+                      {count} <span className="text-sm font-medium opacity-70">Units</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold flex items-center gap-2 text-gray-800">
+                  <MapPin className="text-blue-600" size={20} />
+                  Live Map
+                </h2>
+
+                <button
+                  onClick={handleUpdateLocation}
+                  disabled={isUpdatingLocation}
+                  className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-green-700 transition"
+                >
+                  {isUpdatingLocation ? (
+                    <Loader size={16} className="animate-spin" />
+                  ) : (
+                    <Save size={16} />
+                  )}
+                  Save Location
+                </button>
+              </div>
+
+              <div className="h-96 w-full rounded-xl overflow-hidden border-2 border-gray-200 relative z-0">
+                <MapContainer center={markerPosition} zoom={13} style={{ height: "100%", width: "100%" }}>
+                  <TileLayer
+                    attribution="&copy; OpenStreetMap contributors"
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+
+                  <DraggableMarker position={markerPosition} setPosition={setMarkerPosition} />
+
+                  {foundDonors.map((donor) =>
+                    donor.location && donor.location.coordinates ? (
+                      <CircleMarker
+                        key={donor._id}
+                        center={[
+                          donor.location.coordinates[1],
+                          donor.location.coordinates[0]
+                        ]}
+                        pathOptions={{
+                          color: 'red',
+                          fillColor: '#f00',
+                          fillOpacity: 0.7
+                        }}
+                        radius={8}
+                      >
+                        <Tooltip>
+                          {donor.fullName} ({donor.bloodGroup})
+                        </Tooltip>
+                      </CircleMarker>
+                    ) : null
+                  )}
+                </MapContainer>
+              </div>
+
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                *Drag the Blue Marker to set Hospital location. Red dots are found donors.
+              </p>
+            </div>
+
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border-t-4 border-red-600 h-fit">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-red-100 p-2 rounded-full animate-pulse">
+                <AlertTriangle className="text-red-600" size={24} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Emergency Broadcast</h2>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+              Locate registered donors within <span className="font-bold text-gray-900">10 KM</span>.
+            </p>
+
+            <form onSubmit={handleRequest} className="space-y-5">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">
+                  Blood Group
+                </label>
+                <select
+                  className="w-full p-3 border border-gray-300 rounded-lg outline-none bg-gray-50"
+                  value={requestData.bloodGroup}
+                  onChange={(e) =>
+                    setRequestData({ ...requestData, bloodGroup: e.target.value })
+                  }
+                >
+                  {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">
+                  Units
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  className="w-full p-3 border border-gray-300 rounded-lg outline-none bg-gray-50"
+                  value={requestData.units}
+                  onChange={(e) =>
+                    setRequestData({ ...requestData, units: e.target.value })
+                  }
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={requestLoading}
+                className="w-full bg-red-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-red-700 transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-70"
+              >
+                {requestLoading ? (
+                  <Loader className="animate-spin" />
+                ) : (
+                  <AlertTriangle className="fill-current" />
+                )}
+                {requestLoading ? "Broadcasting..." : "Find Donors Nearby"}
+              </button>
+            </form>
+          </div>
+
         </div>
 
-        {/* === INVENTORY MODAL === */}
         {isInventoryModalOpen && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-                <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-100">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-bold text-gray-800">Update Blood Stock</h2>
-                        <button onClick={() => setIsInventoryModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-                    </div>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+            <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-100">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">
+                  Update Blood Stock
+                </h2>
+                <button
+                  onClick={() => setIsInventoryModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
 
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                        {Object.keys(tempInventory).map((bloodGroup) => (
-                            <div key={bloodGroup} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                <span className="font-bold text-lg text-gray-700">{bloodGroup}</span>
-                                <input 
-                                    type="number" 
-                                    min="0"
-                                    className="w-20 p-2 border border-gray-300 rounded-md text-center font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                                    value={tempInventory[bloodGroup]}
-                                    onChange={(e) => setTempInventory({
-                                        ...tempInventory,
-                                        [bloodGroup]: parseInt(e.target.value) || 0
-                                    })}
-                                />
-                            </div>
-                        ))}
-                    </div>
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                {Object.keys(tempInventory).map((bloodGroup) => (
+                  <div
+                    key={bloodGroup}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <span className="font-bold text-lg text-gray-700">
+                      {bloodGroup}
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-20 p-2 border border-gray-300 rounded-md text-center font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={tempInventory[bloodGroup]}
+                      onChange={(e) =>
+                        setTempInventory({
+                          ...tempInventory,
+                          [bloodGroup]: parseInt(e.target.value) || 0
+                        })
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
 
-                    <div className="flex gap-3">
-                        <button 
-                            onClick={() => setIsInventoryModalOpen(false)}
-                            className="flex-1 py-3 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition"
-                        >
-                            Cancel
-                        </button>
-                        <button 
-                            onClick={handleInventoryUpdate}
-                            className="flex-1 bg-blue-900 text-white py-3 rounded-xl font-bold hover:bg-blue-800 transition shadow-lg"
-                        >
-                            Save Changes
-                        </button>
-                    </div>
-                </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setIsInventoryModalOpen(false)}
+                  className="flex-1 py-3 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleInventoryUpdate}
+                  className="flex-1 bg-blue-900 text-white py-3 rounded-xl font-bold hover:bg-blue-800 transition shadow-lg"
+                >
+                  Save Changes
+                </button>
+              </div>
             </div>
+          </div>
         )}
 
       </div>

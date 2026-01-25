@@ -16,6 +16,7 @@ router.get("/all", protectRoute, getAllEvents);
 
 router.post("/:id/donated", protectRoute, markAsDonated);
 
+
 // 3. Get My Events (Private - for College Dashboard)
 router.get("/my-events", protectRoute, getMyEvents);
 
