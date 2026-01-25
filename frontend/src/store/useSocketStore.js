@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { io } from "socket.io-client";
 import { useAuthStore } from "./useAuthStore";
 
-const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:3000" : "/";
+const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:3000" : "https://bloodlink-4edh.onrender.com";
 
 export const useSocketStore = create((set, get) => ({
   socket: null,
