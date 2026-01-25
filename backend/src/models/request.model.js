@@ -34,5 +34,34 @@ const requestSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+
+export const getStats = async (req, res) => {
+  try {
+    // 1. Count Total Donors (role = 'donor')
+    const totalDonors = await User.countDocuments({ role: "donor" });
+
+    // 2. Count Active Requests (Emergencies happening right now)
+    const activeRequests = await Request.countDocuments({ status: "Active" });
+
+    // 3. Lives Saved (Fulfilled Requests)
+    // We assume 1 Request Fulfilled = 1 Life Impacted (conservative estimate)
+    const fulfilledRequests = await Request.countDocuments({ status: "Fulfilled" });
+
+    res.status(200).json({
+      donors: totalDonors,
+      active: activeRequests,
+      livesSaved: fulfilledRequests
+    });
+
+  } catch (error) {
+    console.log("Error fetching stats:", error.message);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
 const Request = mongoose.model("Request", requestSchema);
+
+
+
+
 export default Request;

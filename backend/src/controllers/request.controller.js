@@ -153,3 +153,28 @@ export const getAllRequests = async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 };
+
+
+export const getStats = async (req, res) => {
+  try {
+    // 1. Count Total Donors (We assume 'individual' or 'student' are donors)
+    // Adjust the query if your roles are different (e.g., role: "donor")
+    const totalDonors = await User.countDocuments({ role: { $in: ["donor", "individual", "student"] } });
+
+    // 2. Count Active Requests
+    const activeRequests = await Request.countDocuments({ status: "Active" });
+
+    // 3. Lives Saved (Fulfilled Requests)
+    const fulfilledRequests = await Request.countDocuments({ status: "Fulfilled" });
+
+    res.status(200).json({
+      donors: totalDonors,
+      active: activeRequests,
+      livesSaved: fulfilledRequests
+    });
+
+  } catch (error) {
+    console.log("Error fetching stats:", error.message);
+    res.status(500).json({ message: "Server Error" });
+  }
+};

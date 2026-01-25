@@ -16,11 +16,11 @@ const HeroPage = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await axiosInstance.get("/request/stats");
+        const res = await axiosInstance.get("/requests/stats");
         setStats({
-          requests: res.data.requests || 0,
+          requests: res.data.active || 0, // Mapped to backend 'active'
           donors: res.data.donors || 0,
-          saved: res.data.saved || 0
+          saved: res.data.livesSaved || 0 // Mapped to backend 'livesSaved'
         });
       } catch (error) {
         console.error("Stats fetch failed (using defaults)");

@@ -324,3 +324,42 @@ export const updateInventory = async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 };
+
+
+export const searchNearbyHospitals = async (req, res) => {
+  try {
+    const { latitude, longitude, bloodGroup, radius = 15000 } = req.query;
+
+    if (!latitude || !longitude || !bloodGroup) {
+      return res.status(400).json({ message: "Location and Blood Group are required." });
+    }
+
+    // Dynamic Inventory Key (e.g., 'inventory.A+')
+    const stockQuery = {};
+    stockQuery[`inventory.${bloodGroup}`] = { $gt: 0 }; // Only show if stock > 0
+
+    const hospitals = await Hospital.find({
+      ...stockQuery, // Apply Stock Filter
+      location: {
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [parseFloat(longitude), parseFloat(latitude)]
+          },
+          $maxDistance: parseInt(radius) // Default 15km
+        }
+      }
+    }).select("hospitalName address contactNumber location inventory totalBloodUnits operatingHours");
+
+    // "Stack on nearest one" - MongoDB $near automatically sorts by distance!
+    
+    res.status(200).json({
+      count: hospitals.length,
+      data: hospitals
+    });
+
+  } catch (error) {
+    console.log("Error in searchNearbyHospitals:", error.message);
+    res.status(500).json({ message: "Server Error" });
+  }
+};

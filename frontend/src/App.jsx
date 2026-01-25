@@ -12,7 +12,7 @@ import HeroPage from "./pages/HeroPage";
 import HomePage from "./pages/HomePage";
 import SignUpPage from "./pages/SignUpPage";
 import LoginPage from "./pages/LoginPage";
-import BloodCentersPage from "./pages/BloodCentersPage";
+import BloodCentersPage from './pages/BloodCentersPage';
 import AboutPage from "./pages/AboutPage";
 
 // Hospital Pages
@@ -24,6 +24,7 @@ import HospitalDashboard from "./pages/HospitalDashboard";
 import CollegeRegistrationPage from "./pages/CollegeRegistrationPage";
 import CollegeLoginPage from "./pages/CollegeLoginPage";
 import CollegeDashboard from "./pages/CollegeDashboard";
+import RequestBloodPage from "./pages/RequestBloodPage";
 
 
 
@@ -159,6 +160,12 @@ const App = () => {
             !authUser ? <HospitalOnboardingPage /> : <Navigate to="/hospital" />
           }
         />
+
+        <Route 
+          path="/request" 
+          // ✅ FIX: Redirect to /login if user is not found
+          element={authUser ? <RequestBloodPage /> : <Navigate to="/login" />} 
+        />
         <Route
           path="/hospital/login"
           element={
@@ -206,7 +213,6 @@ const App = () => {
           }
         />
 
-        <Route path="/blood-center" element={<BloodCenter />} />
       </Routes>
     </div>
   );
