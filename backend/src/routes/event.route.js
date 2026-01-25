@@ -6,7 +6,8 @@ import {
     getMyEvents,    // New function
     joinEvent,      // Was registerForEvent
     updateEvent,
-    leaveEvent     // New function
+    leaveEvent,
+    deleteEvent     // New function
 } from "../controllers/event.controller.js";
 
 const router = express.Router();
@@ -27,5 +28,7 @@ router.post("/join/:id", protectRoute, joinEvent);
 router.put("/:id", protectRoute, updateEvent);
 
 router.post("/leave/:id", protectRoute, leaveEvent);
+
+router.delete("/:id", protectRoute, deleteEvent);
 
 export default router;

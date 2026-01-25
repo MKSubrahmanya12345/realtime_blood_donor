@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
-import { Plus, Calendar, MapPin, Users, Edit2, X, Clock } from "lucide-react";
+// 1. Added Trash2 to imports
+import { Plus, Calendar, MapPin, Users, Edit2, X, Clock, Trash2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 const CollegeDashboard = () => {
@@ -37,22 +38,40 @@ const CollegeDashboard = () => {
     }
   };
 
+  // === DELETE FUNCTION ===
+  const handleDelete = async (eventId) => {
+    if (!window.confirm("Are you sure you want to delete this event?")) {
+      return;
+    }
+
+    try {
+      await axiosInstance.delete(`/events/${eventId}`);
+      
+      // Remove the deleted event from state immediately (better UX than reloading)
+      setEvents((prevEvents) => prevEvents.filter((event) => event._id !== eventId));
+      
+      toast.success("Event deleted successfully");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete event");
+    }
+  };
+
   // === ADD MODE ===
-    const handleAddClick = () => {
-        setFormData({
-            title: "",
-            description: "",
-            date: "",
-            numberOfDays: 1,
-            // Pre-fill visual feedback for the user
-            location: authUser?.address || authUser?.location || "College Campus",
-            organizerName: authUser?.collegeName || authUser?.fullName || "",
-            contactNumber: authUser?.phone || "",
-        });
-        setIsEditing(false);
-        setCurrentEventId(null);
-        setShowModal(true);
-    };
+  const handleAddClick = () => {
+    setFormData({
+      title: "",
+      description: "",
+      date: "",
+      numberOfDays: 1,
+      location: authUser?.address || authUser?.location || "College Campus",
+      organizerName: authUser?.collegeName || authUser?.fullName || "",
+      contactNumber: authUser?.phone || "",
+    });
+    setIsEditing(false);
+    setCurrentEventId(null);
+    setShowModal(true);
+  };
 
   // === EDIT MODE ===
   const handleEditClick = (event) => {
@@ -132,12 +151,26 @@ const CollegeDashboard = () => {
                     <div className="bg-red-50 p-3 rounded-lg">
                       <Calendar className="text-[#b30000]" size={24} />
                     </div>
-                    <button
-                      onClick={() => handleEditClick(event)}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition"
-                    >
-                      <Edit2 size={18} />
-                    </button>
+                    
+                    {/* Action Buttons Container */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditClick(event)}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition"
+                        title="Edit Event"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      
+                      {/* NEW: Delete Button */}
+                      <button
+                        onClick={() => handleDelete(event._id)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition"
+                        title="Delete Event"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </div>
 
                   <h3 className="text-xl font-bold text-gray-800 mb-2">
