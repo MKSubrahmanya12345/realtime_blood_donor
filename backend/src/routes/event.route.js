@@ -7,7 +7,8 @@ import {
     joinEvent,      // Was registerForEvent
     updateEvent,
     leaveEvent,
-    deleteEvent     // New function
+    deleteEvent,
+    getCertificateData     // New function
 } from "../controllers/event.controller.js";
 
 const router = express.Router();
@@ -30,5 +31,8 @@ router.put("/:id", protectRoute, updateEvent);
 router.post("/leave/:id", protectRoute, leaveEvent);
 
 router.delete("/:id", protectRoute, deleteEvent);
+
+// 6. Get Certificate Data
+router.get("/certificate/:id", protectRoute, getCertificateData);
 
 export default router;

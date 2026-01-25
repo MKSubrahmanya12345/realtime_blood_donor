@@ -206,3 +206,37 @@ export const deleteEvent = async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 };
+
+
+// === 7. VERIFY & GET CERTIFICATE DATA ===
+export const getCertificateData = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const event = await Event.findById(id);
+    if (!event) return res.status(404).json({ message: "Event not found" });
+
+    // 1. Check if User Participated
+    if (!event.participants.includes(userId)) {
+      return res.status(403).json({ message: "You did not register for this event." });
+    }
+
+    // 2. Check Verification (Optional: Ensure they actually donated)
+    // For now, we assume registration + active donor status = eligible
+    if (!req.user.isVerifiedDonor) {
+        return res.status(403).json({ message: "Your donor status is not verified yet." });
+    }
+
+    res.status(200).json({
+      eligible: true,
+      userName: req.user.fullName,
+      eventName: event.title,
+      date: event.date
+    });
+
+  } catch (error) {
+    console.log("Error getCertificateData:", error.message);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
