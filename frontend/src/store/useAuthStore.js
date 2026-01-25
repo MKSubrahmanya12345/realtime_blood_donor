@@ -118,21 +118,29 @@ export const useAuthStore = create((set, get) => ({
         }
     },
 
-    // === 5. LOGOUT ===
     logout: async () => {
     try {
         await axiosInstance.post("/auth/logout");
-        set({ authUser: null });
-        // Hard reset the socket store too
-        useSocketStore.getState().disconnectSocket(); 
-        toast.success("Logged out successfully");
-        // Force a redirect if the UI is stuck
-        window.location.href = "/"; 
     } catch (error) {
-        toast.error("");
-        console.error("Logout error:", error);
+        console.error("Logout API failed:", error);
+    } finally {
+        // 1) Clear auth state
+        set({ authUser: null });
+
+        // 2) Kill both sockets
+        get().disconnectSocket();
+        useSocketStore.getState().disconnectSocket();
+
+        // 3) Remove token so checkAuth can’t resurrect you
+        localStorage.removeItem("jwt");
+
+        toast.success("Logged out successfully");
+
+        // 4) Hard redirect to clean slate
+        window.location.href = "/login";
     }
     },
+
 
     // === 6. SOCKET CONNECTION (The Fix) ===
     connectSocket: () => {
