@@ -116,3 +116,5 @@ const BloodCenter = () => {
     </div>
   );
 };
+
+export default BloodCenter;
