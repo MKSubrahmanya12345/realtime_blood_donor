@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-const BloodCenter = () => {
+const Bloodcenter = () => {
   return (
     <div className="min-h-screen bg-[#f4f6f8] font-sans pb-10">
       
@@ -117,4 +117,4 @@ const BloodCenter = () => {
   );
 };
 
-export default BloodCenter;
+export default Bloodcenter;
