@@ -2,85 +2,88 @@ import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
 import { generateToken } from "../lib/utils.js";
 import mongoose from "mongoose";
-import { sendEmail } from "../lib/email.js"; // Import Email Helper
+import { sendEmail } from "../lib/email.js"; 
 
-// === 1. SIGNUP (Optimized: Non-blocking Email) ===
+// === 1. SIGNUP ===
 export const signup = async (req, res) => {
-  const { fullName, email, password, role, collegeId, ...otherData } = req.body;
-  try {
-    if (password.length < 6) return res.status(400).json({ message: "Password must be at least 6 characters" });
+  const { fullName, email, password, role, collegeId, phone, bloodGroup, ...otherData } = req.body;
 
-    // 1. Generate a REAL 6-digit Code
+  try {
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    // Generate Code
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // 2. Check Existing User
+    // Check Existing User
     let user = await User.findOne({ email });
 
     if (user) {
-        if (user.isVerifiedDonor) {
-            return res.status(400).json({ message: "Email already exists" });
-        } else {
-            // === PENDING USER: UPDATE & RESEND ===
-            const salt = await bcrypt.genSalt(10);
-            user.password = await bcrypt.hash(password, salt);
-            user.fullName = fullName;
-            user.role = role;
-            user.verificationCode = verificationCode; // Save New Code
-            
-            // Update College ID if valid
-            if (role !== 'college' && collegeId && mongoose.Types.ObjectId.isValid(collegeId)) {
-                user.collegeId = collegeId;
-            }
-            
-            await user.save();
+      if (user.isVerifiedDonor) {
+        return res.status(400).json({ message: "Email already exists" });
+      } else {
+        // Update Pending User
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(password, salt);
+        user.fullName = fullName;
+        user.role = role || user.role || "pending";
+        user.verificationCode = verificationCode; // SAVES NOW because we fixed the model
+        user.phone = phone;
+        user.bloodGroup = bloodGroup;
 
-            // LOG CODE (Backup for Dev)
-            console.log(`[DEV] Real OTP for ${email}: ${verificationCode}`);
-
-            // === FIX 1: Send in Background (No await) ===
-            sendEmail(email, "Verify Your Account", `Code: ${verificationCode}`)
-                .catch(err => console.error("Background Email Failed:", err.message));
-
-            // Return response IMMEDIATELY
-            return res.status(200).json({ 
-                _id: user._id, email: user.email, role: user.role, 
-                message: "Verification code resent" 
-            });
+        if (role !== "college" && collegeId && mongoose.Types.ObjectId.isValid(collegeId)) {
+          user.collegeId = collegeId;
         }
+
+        await user.save();
+
+        console.log(`[DEV] Signup OTP for ${email}: ${verificationCode}`);
+
+        sendEmail(email, "Verify Your Account", `Code: ${verificationCode}`)
+          .catch(err => console.error("Email Failed:", err.message));
+
+        return res.status(200).json({
+          _id: user._id,
+          email: user.email,
+          role: user.role,
+          message: "Verification code sent",
+        });
+      }
     }
 
-    // 3. NEW USER
+    // New User
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Safe College ID Check
-    let safeCollegeId = undefined;
-    if (role !== 'college' && collegeId && mongoose.Types.ObjectId.isValid(collegeId)) {
-        safeCollegeId = collegeId;
-    }
+    const safeCollegeId = role !== "college" && collegeId && mongoose.Types.ObjectId.isValid(collegeId)
+      ? collegeId
+      : undefined;
 
     const newUser = new User({
-      fullName, email, 
-      password: hashedPassword, 
-      role, 
+      fullName,
+      email,
+      password: hashedPassword,
+      role: role || "pending",
       collegeId: safeCollegeId,
-      verificationCode, // Save Real Code
+      verificationCode, // This matches the Schema now
+      phone,
+      bloodGroup,
       ...otherData,
     });
 
     await newUser.save();
 
-    // LOG CODE (Backup for Dev)
-    console.log(`[DEV] Real OTP for ${email}: ${verificationCode}`);
+    console.log(`[DEV] Signup OTP for ${email}: ${verificationCode}`);
 
-    // === FIX 2: Send in Background (No await) ===
     sendEmail(email, "Verify Your Account", `Code: ${verificationCode}`)
-        .catch(err => console.error("Background Email Failed:", err.message));
+      .catch(err => console.error("Email Failed:", err.message));
 
-    // Return response IMMEDIATELY
-    res.status(201).json({ 
-        _id: newUser._id, email: newUser.email, role: newUser.role,
-        message: "Account created"
+    res.status(201).json({
+      _id: newUser._id,
+      email: newUser.email,
+      role: newUser.role,
+      message: "Account created. Verify email next.",
     });
 
   } catch (error) {
@@ -159,36 +162,104 @@ export const toggleAvailability = async (req, res) => {
     }
 };
 
-// === 7. VERIFY OTP ===
+// === 7. VERIFY OTP (THE FIX) ===
 export const verifyOtp = async (req, res) => {
-    try {
-        const { email, otp } = req.body; 
-        const user = await User.findOne({ email });
+  try {
+    const { email, otp, type } = req.body;
 
-        if (!user) return res.status(404).json({ message: "User not found" });
-
-        const isValid = (otp === user.verificationCode) || (otp === "111111");
-
-        if (isValid) {
-            user.isVerifiedDonor = true;
-            user.isEmailVerified = true;
-            user.isPhoneVerified = true;
-            user.verificationCode = undefined;
-            await user.save();
-
-            generateToken(user._id, res);
-
-            return res.status(200).json({ 
-                message: "Verified Successfully! ✅",
-                isFullyVerified: true,
-                user: user,
-            });
-        }
-
-        return res.status(400).json({ message: "Invalid OTP" });
-
-    } catch (error) {
-        console.log("Error verifyOtp:", error);
-        res.status(500).json({ message: "Server Error" });
+    if (!email || !otp || !type) {
+      return res.status(400).json({ message: "Missing email, otp, or type" });
     }
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // === STEP 1: EMAIL VERIFICATION ===
+    if (type === "email") {
+      // Compare with the code stored in DB
+      if (otp !== user.verificationCode) {
+        return res.status(400).json({ message: "Invalid Email OTP" });
+      }
+
+      // SUCCESS: Set a temporary cookie proving they passed email
+      // DO NOT SAVE TO DB YET
+      res.cookie("email_verified_proof", "true", { 
+        httpOnly: true, 
+        maxAge: 15 * 60 * 1000 // 15 mins validity
+      });
+
+      // Send fake success to frontend so UI updates
+      return res.status(200).json({
+        message: "Email Verified! Please verify phone.",
+        user: { ...user.toObject(), isEmailVerified: true }
+      });
+    }
+
+    // === STEP 2: PHONE VERIFICATION ===
+    else if (type === "phone") {
+      // 1. Check Phone OTP (Hardcoded for testing)
+      if (otp !== "111111") {
+        return res.status(400).json({ message: "Invalid Phone OTP" });
+      }
+
+      // 2. CHECK COOKIE: Did they verify email?
+      if (!req.cookies.email_verified_proof && !user.isEmailVerified) {
+        return res.status(400).json({ message: "Please verify email first!" });
+      }
+
+      // 3. FINAL SAVE: Both steps passed
+      user.isEmailVerified = true;
+      user.isPhoneVerified = true;
+      user.isVerifiedDonor = true; // Activate account
+      user.verificationCode = undefined; // Clear code
+
+      await user.save();
+
+      // Clear the temporary cookie
+      res.clearCookie("email_verified_proof");
+
+      // Generate Login Token
+      generateToken(user._id, res);
+
+      return res.status(200).json({
+        message: "Registration Complete! ✅",
+        isFullyVerified: true,
+        user: user,
+      });
+    } else {
+      return res.status(400).json({ message: "Invalid verification type" });
+    }
+
+  } catch (error) {
+    console.error("Error in verifyOtp:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+export const resendEmailOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required" });
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({ message: "Email already verified" });
+    }
+
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.verificationCode = newOtp; // Correct field now
+    await user.save();
+
+    sendEmail(email, "Verify Your Account", `Code: ${newOtp}`)
+      .catch(err => console.error("Email Failed:", err.message));
+
+    console.log(`[DEV] Resent OTP for ${email}: ${newOtp}`);
+
+    res.status(200).json({ message: "Verification code resent successfully" });
+  } catch (error) {
+    console.log("Error in resendEmailOtp:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
 };

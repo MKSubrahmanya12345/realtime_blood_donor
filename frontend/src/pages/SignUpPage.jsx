@@ -81,6 +81,8 @@ const SignUpPage = () => {
     email: false,
     phone: false
   });
+  const [isResending, setIsResending] = useState(false);
+
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -132,6 +134,22 @@ const SignUpPage = () => {
       );
     }
   };
+
+  const handleResendEmailOtp = async () => {
+    if (!registeredEmail) return;
+
+    setIsResending(true);
+    try {
+      await axiosInstance.post('/auth/resend-email-otp', { email: registeredEmail });
+      toast.success("OTP resent to your email!");
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Failed to resend OTP");
+    } finally {
+      setIsResending(false);
+    }
+  };
+
 
   const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -382,13 +400,25 @@ const SignUpPage = () => {
       {/* EMAIL OTP */}
       <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
         <div className="flex justify-between items-center mb-2">
-          <label className="font-semibold text-gray-700">Email OTP</label>
-          {verificationStatus.email && (
+          <label className="font-semibold text-gray-700">
+            Email OTP (*Check your mail*)
+          </label>
+
+          {verificationStatus.email ? (
             <span className="text-green-600 flex items-center text-sm">
               <CheckCircle size={16} className="mr-1" /> Verified
             </span>
+          ) : (
+            <button
+              onClick={handleResendEmailOtp}
+              disabled={isResending}
+              className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+            >
+              {isResending ? <Loader size={12} className="animate-spin" /> : "Resend OTP"}
+            </button>
           )}
         </div>
+
 
         <div className="flex gap-2">
           <input
@@ -413,7 +443,7 @@ const SignUpPage = () => {
       {/* PHONE OTP */}
       <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
         <div className="flex justify-between items-center mb-2">
-          <label className="font-semibold text-gray-700">Phone OTP</label>
+          <label className="font-semibold text-gray-700">Phone OTP (* Use 111111 since it's a test*)</label>
           {verificationStatus.phone && (
             <span className="text-green-600 flex items-center text-sm">
               <CheckCircle size={16} className="mr-1" /> Verified

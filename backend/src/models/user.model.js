@@ -27,9 +27,8 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
     },
-
     collegeId: {
-      type: String, // Roll Number
+      type: String, 
     },
     collegeName: {
       type: String,
@@ -49,34 +48,29 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    emailOtp: {
-      type: String, // Store the 6-digit code
+    // === VITAL FIX: This field must exist for the code to save ===
+    verificationCode: {
+      type: String, 
     },
-    phoneOtp: {
-      type: String, // Store the 6-digit code
-    },
+    // =============================================================
+    
     otpExpires: {
-      type: Date, // OTP validity (e.g., 10 mins)
+      type: Date, 
     },
     address: { 
         type: String 
-    }, // Human readable address (e.g. "Koramangala, Bangalore")
+    }, 
     location: {
       type: { type: String},
-      coordinates: { type: [Number], index: "2dsphere" }, // [Longitude, Latitude]
+      coordinates: { type: [Number], index: "2dsphere" }, 
     },
     isAvailable: { type: Boolean, default: true }, 
-        lastDonationDate: { type: Date, default: null 
-
-    },
+    lastDonationDate: { type: Date, default: null },
     isVerifiedDonor: { 
       type: Boolean, 
       default: false 
     },
-        
   },
-
-  
   {
     timestamps: true,
   },

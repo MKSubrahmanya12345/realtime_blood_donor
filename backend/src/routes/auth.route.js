@@ -1,5 +1,5 @@
 import express from "express";
-import { signup, login, logout, verifyOtp, checkAuth, updateProfile, toggleAvailability } from "../controllers/auth.controller.js";
+import { signup, login, logout, verifyOtp, checkAuth, updateProfile, toggleAvailability, resendEmailOtp } from "../controllers/auth.controller.js";
 
 import { protectRoute } from "../middleware/auth.middleware.js"; // Import the middleware
 
@@ -20,4 +20,6 @@ router.put("/toggle-availability", protectRoute, toggleAvailability);
 
 router.get("/check", protectRoute, checkAuth);
 router.put("/update-profile", protectRoute, updateProfile); // <--- ADD THIS LINE
+router.post("/resend-email-otp", resendEmailOtp);
+
 export default router;

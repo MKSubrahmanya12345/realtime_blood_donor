@@ -8,12 +8,15 @@ console.log("User:", process.env.EMAIL_USER ? "Exists ✅" : "UNDEFINED ❌");
 console.log("Pass:", process.env.EMAIL_PASS ? "Exists ✅" : "UNDEFINED ❌");
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true, // true = SSL
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    pass: process.env.EMAIL_PASS, // MUST be App Password
   },
 });
+
 
 // === 1. GENERIC EMAIL (Used by Auth Controller) ===
 export const sendEmail = async (to, subject, text) => {
