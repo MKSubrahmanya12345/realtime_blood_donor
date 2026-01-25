@@ -32,7 +32,7 @@ const AboutPage = () => {
                In medical emergencies, every second counts. Traditional blood donation drives are great, but they don't solve the immediate need for a specific blood type in a specific location.
              </p>
              <p className="text-lg text-gray-600 leading-relaxed">
-               **BloodLink** was built to solve this. By connecting hospitals directly with nearby donors via GPS, we reduce the response time from hours to minutes. We believe that technology can transform the way communities support each other.
+               <bold>BloodLink</bold> was built to solve this. By connecting hospitals directly with nearby donors via GPS, we reduce the response time from hours to minutes. We believe that technology can transform the way communities support each other.
              </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
