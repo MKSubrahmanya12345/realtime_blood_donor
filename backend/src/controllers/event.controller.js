@@ -1,19 +1,16 @@
 import Event from "../models/event.model.js";
 import User from "../models/user.model.js";
 
-// === 1. CREATE EVENT (Colleges Only) ===
-// === 1. CREATE EVENT (Auto-Fill Version) ===
+// === 1. CREATE EVENT (Features: Auto-Fill College Details) ===
 export const createEvent = async (req, res) => {
   try {
     const { title, description, date, numberOfDays } = req.body;
 
-    // Validation
     if (!title || !description || !date) {
         return res.status(400).json({ message: "Please fill Title, Description, and Date." });
     }
 
-    // === BORROW DETAILS FROM LOGGED-IN COLLEGE ===
-    // We prioritize req.user data over req.body
+    // Feature: Auto-fill details from the logged-in college user
     const collegeLocation = req.user.address || req.user.location || "College Campus";
     const collegeName = req.user.collegeName || req.user.fullName || "College Admin";
     const collegePhone = req.user.phone || req.user.contactNumber || "N/A";
@@ -23,12 +20,9 @@ export const createEvent = async (req, res) => {
       description,
       date,
       numberOfDays: numberOfDays || 1,
-      
-      // Auto-filled details
       location: collegeLocation,
       organizerName: collegeName,
       contactNumber: collegePhone,
-      
       collegeId: req.user._id, 
       participants: []
     });
@@ -42,13 +36,10 @@ export const createEvent = async (req, res) => {
   }
 };
 
-// === 2. GET ALL EVENTS (Public - For Donors) ===
+// === 2. GET ALL EVENTS (Public) ===
 export const getAllEvents = async (req, res) => {
   try {
-
-    if (!req.user) {
-        return res.status(200).json([]); // Or throw error: "Please login to see events"
-    }
+    if (!req.user) return res.status(200).json([]);
 
     if (req.user.role === 'college') {
         const events = await Event.find({ collegeId: req.user._id }).sort({ date: 1 });
@@ -68,7 +59,7 @@ export const getAllEvents = async (req, res) => {
   }
 };
 
-// === 3. GET MY EVENTS (Private - For College Dashboard) ===
+// === 3. GET MY EVENTS (Private) ===
 export const getMyEvents = async (req, res) => {
   try {
     const events = await Event.find({ collegeId: req.user._id }).sort({ date: 1 });
@@ -79,7 +70,27 @@ export const getMyEvents = async (req, res) => {
   }
 };
 
-// === 4. JOIN EVENT (Student Registration + Auto-Verification) ===
+// === 4. GET EVENT PARTICIPANTS ===
+export const getEventParticipants = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Ensure the college requesting owns this event
+        const event = await Event.findOne({ _id: id, collegeId: req.user._id })
+            .populate("participants", "fullName email phone bloodGroup isVerifiedDonor role");
+
+        if (!event) {
+            return res.status(404).json({ message: "Event not found or unauthorized" });
+        }
+
+        res.status(200).json(event.participants);
+    } catch (error) {
+        console.log("Error getEventParticipants:", error.message);
+        res.status(500).json({ message: "Server Error" });
+    }
+};
+
+// === 5. JOIN EVENT (Features: Auto-Verify on Registration) ===
 export const joinEvent = async (req, res) => {
   try {
     const eventId = req.params.id || req.body.eventId;
@@ -88,36 +99,27 @@ export const joinEvent = async (req, res) => {
     const event = await Event.findById(eventId);
     if (!event) return res.status(404).json({ message: "Event not found" });
 
-    // Prevent duplicate joins
     if (event.participants.includes(userId)) {
       return res.status(400).json({ message: "You are already registered." });
     }
 
-    // 1. Add User to Event
     event.participants.push(userId);
     await event.save();
 
-    // 2. AUTO-VERIFY USER
+    // Feature: Auto-verify user upon joining (retained from current code)
     const user = await User.findById(userId);
-
     let message = "Registered successfully!";
 
     if (!user.isVerifiedDonor) {
       user.isVerifiedDonor = true;
-
       if (user.role === "pending" || !user.role) {
         user.role = "donor";
       }
-
       await user.save();
       message = "Registered & Account Verified!";
     }
 
-    res.status(200).json({
-      message,
-      isVerifiedDonor: true,
-      event
-    });
+    res.status(200).json({ message, isVerifiedDonor: true, event });
 
   } catch (error) {
     console.log("Error joinEvent:", error.message);
@@ -125,13 +127,40 @@ export const joinEvent = async (req, res) => {
   }
 };
 
-// === 5. UPDATE EVENT (College Edit) ===
+// === 6. MARK STUDENT AS DONATED (NEW FEATURE) ===
+export const markAsDonated = async (req, res) => {
+    try {
+        const { id } = req.params; // Event ID
+        const { studentId } = req.body;
+
+        const event = await Event.findOne({ _id: id, collegeId: req.user._id });
+        if (!event) return res.status(404).json({ message: "Event not found or unauthorized" });
+
+        if (!event.participants.includes(studentId)) {
+            return res.status(400).json({ message: "Student is not registered for this event" });
+        }
+
+        // Update User Status: Mark Verified AND Set Last Donation Date
+        const user = await User.findById(studentId);
+        if (user) {
+            user.isVerifiedDonor = true;
+            user.lastDonationDate = new Date(); // New tracking feature
+            await user.save();
+        }
+
+        res.status(200).json({ message: "Student marked as donated", success: true });
+    } catch (error) {
+        console.log("Error markAsDonated:", error);
+        res.status(500).json({ message: "Server Error" });
+    }
+};
+
+// === 7. UPDATE EVENT ===
 export const updateEvent = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
 
-    // Ensure ownership
     const event = await Event.findOne({ _id: id, collegeId: req.user._id });
 
     if (!event) {
@@ -152,8 +181,7 @@ export const updateEvent = async (req, res) => {
   }
 };
 
-
-// === 6. LEAVE EVENT (Unregister) ===
+// === 8. LEAVE EVENT ===
 export const leaveEvent = async (req, res) => {
   try {
     const eventId = req.params.id || req.body.eventId;
@@ -162,12 +190,10 @@ export const leaveEvent = async (req, res) => {
     const event = await Event.findById(eventId);
     if (!event) return res.status(404).json({ message: "Event not found" });
 
-    // Check if not registered
     if (!event.participants.includes(userId)) {
       return res.status(400).json({ message: "You are not registered for this event." });
     }
 
-    // Remove User from Event using $pull
     event.participants = event.participants.filter(
         (id) => id.toString() !== userId.toString()
     );
@@ -185,13 +211,10 @@ export const leaveEvent = async (req, res) => {
   }
 };
 
-
-
+// === 9. DELETE EVENT ===
 export const deleteEvent = async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Find the event and ensure the logged-in college is the owner
     const event = await Event.findOne({ _id: id, collegeId: req.user._id });
 
     if (!event) {
@@ -199,7 +222,6 @@ export const deleteEvent = async (req, res) => {
     }
 
     await Event.findByIdAndDelete(id);
-
     res.status(200).json({ message: "Event deleted successfully." });
   } catch (error) {
     console.log("Error in deleteEvent:", error.message);
@@ -207,8 +229,7 @@ export const deleteEvent = async (req, res) => {
   }
 };
 
-
-// === 7. VERIFY & GET CERTIFICATE DATA ===
+// === 10. CERTIFICATE DATA ===
 export const getCertificateData = async (req, res) => {
   try {
     const { id } = req.params;
@@ -217,13 +238,12 @@ export const getCertificateData = async (req, res) => {
     const event = await Event.findById(id);
     if (!event) return res.status(404).json({ message: "Event not found" });
 
-    // 1. Check if User Participated
+    // Check participation
     if (!event.participants.includes(userId)) {
       return res.status(403).json({ message: "You did not register for this event." });
     }
 
-    // 2. Check Verification (Optional: Ensure they actually donated)
-    // For now, we assume registration + active donor status = eligible
+    // Check verification status
     if (!req.user.isVerifiedDonor) {
         return res.status(403).json({ message: "Your donor status is not verified yet." });
     }

@@ -143,6 +143,7 @@ export const useAuthStore = create((set, get) => ({
             query: {
                 userId: authUser._id,
             },
+            withCredentials: true, // FIX: Send cookies with socket handshake
         });
 
         newSocket.connect();

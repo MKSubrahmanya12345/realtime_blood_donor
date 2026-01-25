@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
+import { useSocketStore } from '../store/useSocketStore'; // <--- 1. Import Socket Store
 import { axiosInstance } from '../lib/axios';
 import { toast } from 'react-hot-toast';
 import { 
   MapPin, Droplet, Calendar, Power, 
-  Bell, Clock, Users, X, Award, Loader 
+  Bell, Clock, Users, X, Award, Loader, AlertTriangle 
 } from 'lucide-react';
-import jsPDF from 'jspdf'; //
+import jsPDF from 'jspdf';
 
 // === COMPONENT: CERTIFICATE BUTTON ===
 const CertificateButton = ({ event }) => {
@@ -79,11 +80,13 @@ const CertificateButton = ({ event }) => {
 
 const HomePage = () => {
   const { authUser, checkAuth } = useAuthStore();
+  const { socket } = useSocketStore(); // <--- 2. Get Socket
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
+    // 1. Fetch Initial Data
     const fetchNotifications = async () => {
       try {
         const res = await axiosInstance.get('/notifications');
@@ -100,7 +103,22 @@ const HomePage = () => {
 
     fetchNotifications();
     fetchEvents();
-  }, []);
+
+    // 2. Real-time Socket Listener
+    if (socket) {
+      socket.on("emergencyRequest", (newAlert) => {
+        // Play Sound (Optional, handled in App.jsx usually, but good here too)
+        // Add new alert to TOP of list
+        setNotifications(prev => [newAlert, ...prev]);
+      });
+    }
+
+    // Cleanup
+    return () => {
+      if (socket) socket.off("emergencyRequest");
+    };
+
+  }, [socket]); // Re-run if socket connects/disconnects
 
   const handleToggleStatus = async () => {
     setLoading(true);
@@ -161,6 +179,28 @@ const HomePage = () => {
                 <p className="text-sm text-gray-500 mt-1">You are <b>{authUser?.isAvailable ? "Available" : "Unavailable"}</b> for requests.</p>
             </div>
         </div>
+
+        {/* === NEW: LIVE NOTIFICATIONS SECTION === */}
+        {notifications.length > 0 && (
+          <div className="bg-white rounded-xl p-6 shadow-md border-l-4 border-l-[#b30000] animate-in slide-in-from-top-4 duration-500">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Bell className="text-[#b30000] animate-bounce" /> Live Emergency Alerts
+            </h2>
+            <div className="space-y-3">
+              {notifications.map((notif, idx) => (
+                <div key={idx} className="p-4 bg-red-50 border border-red-100 rounded-lg flex items-start gap-3">
+                  <AlertTriangle className="text-red-600 shrink-0 mt-1" size={18} />
+                  <div>
+                    <p className="text-gray-900 font-semibold text-sm">{notif.message}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString() : "Just now"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Events Section */}
         <div>
