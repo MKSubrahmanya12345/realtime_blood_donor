@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import { toast } from "react-hot-toast";
 import { io } from "socket.io-client"; // Import Socket Client
+import { useSocketStore } from "./useSocketStore";
+
 
 // === CRITICAL FIX: Define Backend URL for Socket ===
 const BASE_URL = import.meta.env.MODE === "development" 
@@ -127,7 +129,8 @@ export const useAuthStore = create((set, get) => ({
         // Force a redirect if the UI is stuck
         window.location.href = "/"; 
     } catch (error) {
-        toast.error("Logout failed");
+        toast.error("");
+        console.error("Logout error:", error);
     }
     },
 
