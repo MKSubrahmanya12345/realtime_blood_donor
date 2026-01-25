@@ -121,10 +121,13 @@ export const useAuthStore = create((set, get) => ({
     try {
         await axiosInstance.post("/auth/logout");
         set({ authUser: null });
-        get().disconnectSocket(); // Important!
+        // Hard reset the socket store too
+        useSocketStore.getState().disconnectSocket(); 
         toast.success("Logged out successfully");
+        // Force a redirect if the UI is stuck
+        window.location.href = "/"; 
     } catch (error) {
-        toast.error(error.response.data.message);
+        toast.error("Logout failed");
     }
     },
 
